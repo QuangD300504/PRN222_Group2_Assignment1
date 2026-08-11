@@ -13,6 +13,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // ── Services ─────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
 
 // ── Session (used for login state) ───────────────────────────────────────────
 builder.Services.AddHttpContextAccessor();
@@ -27,6 +28,41 @@ builder.Services.AddSession(options =>
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
+
+// ── Auto Migrate & Seed DB ──────────────────────────────────────────────────
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    dbContext.Database.Migrate();
+
+    // Seed default Subject Leader if missing
+    if (!dbContext.AppUsers.Any(u => u.Email == "leader@gmail.com" || u.Role == "SubjectLeader"))
+    {
+        dbContext.AppUsers.Add(new PRN222_Group2_Assignment1.Models.AppUser
+        {
+            Email = "leader@gmail.com",
+            FullName = "Subject Leader",
+            Password = "leader@123",
+            Role = "SubjectLeader",
+            CreatedAt = DateTime.UtcNow
+        });
+        dbContext.SaveChanges();
+    }
+
+    // Seed default Student if missing
+    if (!dbContext.AppUsers.Any(u => u.Email == "student@gmail.com"))
+    {
+        dbContext.AppUsers.Add(new PRN222_Group2_Assignment1.Models.AppUser
+        {
+            Email = "student@gmail.com",
+            FullName = "Student",
+            Password = "student@123",
+            Role = "Student",
+            CreatedAt = DateTime.UtcNow
+        });
+        dbContext.SaveChanges();
+    }
+}
 
 if (!app.Environment.IsDevelopment())
 {
