@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PRN222_Group2_Assignment1.Data;
 
@@ -11,9 +12,11 @@ using PRN222_Group2_Assignment1.Data;
 namespace PRN222_Group2_Assignment1.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260812033632_AddDocumentManagementFlow1")]
+    partial class AddDocumentManagementFlow1
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -309,7 +312,7 @@ namespace PRN222_Group2_Assignment1.Migrations
                             Id = 1,
                             ChunkIndex = 1,
                             Content = "DbContext in Entity Framework Core is designed to be short-lived. Always use AddDbContext with Scoped lifetime in ASP.NET Core web applications.",
-                            CreatedAt = new DateTime(2026, 8, 12, 3, 54, 46, 824, DateTimeKind.Utc).AddTicks(2747),
+                            CreatedAt = new DateTime(2026, 8, 12, 3, 36, 31, 758, DateTimeKind.Utc).AddTicks(1243),
                             DocumentId = 1,
                             HasEmbedding = true,
                             Heading = "1. DbContext Lifecycle",
@@ -321,7 +324,7 @@ namespace PRN222_Group2_Assignment1.Migrations
                             Id = 2,
                             ChunkIndex = 2,
                             Content = "For read-only queries, calling AsNoTracking() avoids change tracker overhead, boosting performance by up to 30% for large data retrieval.",
-                            CreatedAt = new DateTime(2026, 8, 12, 3, 54, 46, 824, DateTimeKind.Utc).AddTicks(2749),
+                            CreatedAt = new DateTime(2026, 8, 12, 3, 36, 31, 758, DateTimeKind.Utc).AddTicks(1245),
                             DocumentId = 1,
                             HasEmbedding = true,
                             Heading = "2. AsNoTracking Query Optimization",
@@ -333,7 +336,7 @@ namespace PRN222_Group2_Assignment1.Migrations
                             Id = 3,
                             ChunkIndex = 3,
                             Content = "Ensure foreign keys and frequently filtered columns are indexed in EF Core using HasIndex() in OnModelCreating.",
-                            CreatedAt = new DateTime(2026, 8, 12, 3, 54, 46, 824, DateTimeKind.Utc).AddTicks(2750),
+                            CreatedAt = new DateTime(2026, 8, 12, 3, 36, 31, 758, DateTimeKind.Utc).AddTicks(1247),
                             DocumentId = 1,
                             HasEmbedding = true,
                             Heading = "3. Explicit Indexing on Foreign Keys",
@@ -345,7 +348,7 @@ namespace PRN222_Group2_Assignment1.Migrations
                             Id = 4,
                             ChunkIndex = 4,
                             Content = "Use EF.CompileAsyncQuery for hot paths to bypass query expression tree parsing overhead.",
-                            CreatedAt = new DateTime(2026, 8, 12, 3, 54, 46, 824, DateTimeKind.Utc).AddTicks(2751),
+                            CreatedAt = new DateTime(2026, 8, 12, 3, 36, 31, 758, DateTimeKind.Utc).AddTicks(1249),
                             DocumentId = 1,
                             HasEmbedding = true,
                             Heading = "4. Compiled Queries",
@@ -357,7 +360,7 @@ namespace PRN222_Group2_Assignment1.Migrations
                             Id = 5,
                             ChunkIndex = 1,
                             Content = "Async methods yield control back to the calling thread when awaiting an incomplete Task, preventing UI or HTTP worker thread blocking.",
-                            CreatedAt = new DateTime(2026, 8, 12, 3, 54, 46, 824, DateTimeKind.Utc).AddTicks(2752),
+                            CreatedAt = new DateTime(2026, 8, 12, 3, 36, 31, 758, DateTimeKind.Utc).AddTicks(1250),
                             DocumentId = 2,
                             HasEmbedding = true,
                             Heading = "Slide 2: Thread Pool & Synchronization Context",
@@ -369,7 +372,7 @@ namespace PRN222_Group2_Assignment1.Migrations
                             Id = 6,
                             ChunkIndex = 2,
                             Content = "Async void should only be used for event handlers. Returning Task allows exception propagation and proper async orchestration.",
-                            CreatedAt = new DateTime(2026, 8, 12, 3, 54, 46, 824, DateTimeKind.Utc).AddTicks(2755),
+                            CreatedAt = new DateTime(2026, 8, 12, 3, 36, 31, 758, DateTimeKind.Utc).AddTicks(1251),
                             DocumentId = 2,
                             HasEmbedding = true,
                             Heading = "Slide 5: Avoid Async Void",
@@ -381,7 +384,7 @@ namespace PRN222_Group2_Assignment1.Migrations
                             Id = 7,
                             ChunkIndex = 3,
                             Content = "Execute independent HTTP or I/O bound requests concurrently using Task.WhenAll to achieve high throughput.",
-                            CreatedAt = new DateTime(2026, 8, 12, 3, 54, 46, 824, DateTimeKind.Utc).AddTicks(2756),
+                            CreatedAt = new DateTime(2026, 8, 12, 3, 36, 31, 758, DateTimeKind.Utc).AddTicks(1253),
                             DocumentId = 2,
                             HasEmbedding = true,
                             Heading = "Slide 9: Parallel Processing with Task.WhenAll",
@@ -393,7 +396,7 @@ namespace PRN222_Group2_Assignment1.Migrations
                             Id = 8,
                             ChunkIndex = 1,
                             Content = "Semantic chunking splits text at logical structural boundaries such as headings, paragraphs, and lists, preserving original context.",
-                            CreatedAt = new DateTime(2026, 8, 12, 3, 54, 46, 824, DateTimeKind.Utc).AddTicks(2757),
+                            CreatedAt = new DateTime(2026, 8, 12, 3, 36, 31, 758, DateTimeKind.Utc).AddTicks(1254),
                             DocumentId = 3,
                             HasEmbedding = true,
                             Heading = "Section 1: Semantic Chunking Strategy",
@@ -405,7 +408,7 @@ namespace PRN222_Group2_Assignment1.Migrations
                             Id = 9,
                             ChunkIndex = 2,
                             Content = "Including a 100-token sliding window overlap between adjacent chunks prevents information loss at chunk boundaries during retrieval.",
-                            CreatedAt = new DateTime(2026, 8, 12, 3, 54, 46, 824, DateTimeKind.Utc).AddTicks(2758),
+                            CreatedAt = new DateTime(2026, 8, 12, 3, 36, 31, 758, DateTimeKind.Utc).AddTicks(1256),
                             DocumentId = 3,
                             HasEmbedding = true,
                             Heading = "Section 2: Sliding Window & Overlap",
@@ -417,7 +420,7 @@ namespace PRN222_Group2_Assignment1.Migrations
                             Id = 10,
                             ChunkIndex = 3,
                             Content = "Generated embeddings are stored alongside chunk index and metadata, allowing fast cosine similarity search in the RAG retrieval pipeline.",
-                            CreatedAt = new DateTime(2026, 8, 12, 3, 54, 46, 824, DateTimeKind.Utc).AddTicks(2760),
+                            CreatedAt = new DateTime(2026, 8, 12, 3, 36, 31, 758, DateTimeKind.Utc).AddTicks(1257),
                             DocumentId = 3,
                             HasEmbedding = true,
                             Heading = "Section 3: Embedding Vector Storage",
