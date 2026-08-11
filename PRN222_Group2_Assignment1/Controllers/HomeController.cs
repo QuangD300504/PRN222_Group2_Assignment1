@@ -15,7 +15,7 @@ namespace PRN222_Group2_Assignment1.Controllers
 
         public IActionResult Index()
         {
-            return View();
+            return RedirectToAction("Index", "Document");
         }
 
         public IActionResult Privacy()
