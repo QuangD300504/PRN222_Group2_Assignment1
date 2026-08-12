@@ -17,6 +17,7 @@ public class DocumentService(AppDbContext context, IWebHostEnvironment env) : ID
     {
         var subjects = await context.Subjects
             .Include(s => s.Chapters)
+            .Include(s => s.Documents)
             .OrderBy(s => s.Code)
             .ToListAsync();
 

@@ -14,6 +14,10 @@
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
         <div>
             <h2 class="fw-bold text-white mb-0">Quản lý Tài liệu &amp; Embedded Chunks</h2>
+            @if (activeSubject != null && !string.IsNullOrWhiteSpace(activeSubject.Description))
+            {
+                <p class="text-slate-400 fs-7 mb-0 mt-1"><i class="bi bi-info-circle"></i> @activeSubject.Description</p>
+            }
         </div>
 
         <div class="d-flex align-items-center gap-2">
@@ -41,12 +45,13 @@
             @foreach (var sub in Model.Subjects)
             {
                 var isSelected = Model.SelectedSubjectId == sub.Id;
+                var docCount = sub.Documents?.Count ?? 0;
                 <button type="button"
                         class="btn btn-sm rounded-pill px-3 py-1-5 fw-semibold transition-all @(isSelected ? "btn-primary bg-gradient-primary border-0 text-white shadow-sm" : "btn-slate-800 text-slate-300 border-slate-700 hover-slate-700")"
                         data-subject-id="@sub.Id"
                         onclick="switchSubject(@sub.Id)">
                     <span>@sub.Code</span>
-                    <span class="opacity-75 ms-1 fs-8">(@(sub.Documents?.Count ?? 0))</span>
+                    <span class="doc-count opacity-75 ms-1 fs-8" id="subject-count-@sub.Id" data-count="@docCount">(@docCount)</span>
                 </button>
             }
         </div>
@@ -59,6 +64,17 @@
             </button>
         }
     </div>
+
+    <!-- Active Subject Description Callout -->
+    @if (activeSubject != null && !string.IsNullOrWhiteSpace(activeSubject.Description))
+    {
+        <div id="subjectDescCallout" class="bg-slate-850 border border-slate-800 text-slate-300 rounded-3 py-2-5 px-3 mb-4 d-flex align-items-center gap-2 fs-7 shadow-sm">
+            <i class="bi bi-info-circle-fill text-primary-accent fs-6"></i>
+            <div>
+                <strong class="text-white">Mô tả môn học (@activeSubject.Code):</strong> @activeSubject.Description
+            </div>
+        </div>
+    }
 
     <!-- Partial region -->
     <div id="doc-partial-region">
@@ -221,6 +237,32 @@
             return text.replace(/[&<>"']/g, m => map[m]);
         }
 
+        async function onUploadSubjectChange(subjectId) {
+            const uploadSelect = document.getElementById('uploadSubjectSelect');
+            const selectedOpt = uploadSelect?.options[uploadSelect.selectedIndex];
+            const desc = selectedOpt?.getAttribute('data-desc') || '';
+            const descContainer = document.getElementById('uploadSubjectDesc');
+            if (descContainer) {
+                descContainer.innerHTML = desc ? `<span><i class="bi bi-info-circle"></i> ${escapeHtml(desc)}</span>` : '';
+            }
+
+            const chapterSelect = document.getElementById('chapterSelect');
+            chapterSelect.innerHTML = '<option value="">-- Đang tải danh sách chương... --</option>';
+            try {
+                const resp = await fetch(`/Document/GetChapters?subjectId=${subjectId}`);
+                const chapters = await resp.json();
+                let html = '<option value="">-- Toàn bộ môn học (không thuộc chương cụ thể) --</option>';
+                chapters.forEach(ch => {
+                    html += `<option value="${ch.id}">Ch.${ch.chapterNumber} – ${ch.title}</option>`;
+                });
+                html += '<option value="__new__">+ Tạo chương mới...</option>';
+                chapterSelect.innerHTML = html;
+                document.getElementById('newChapterForm').classList.add('d-none');
+            } catch (err) {
+                console.error('Failed to fetch chapters', err);
+            }
+        }
+
         async function submitUpload() {
             const fileInput = document.getElementById('fileInput');
             const alertEl = document.getElementById('uploadAlert');
@@ -233,11 +275,12 @@
 
             const chapterSelect = document.getElementById('chapterSelect');
             const isNewChapter = chapterSelect.value === '__new__';
+            const selectedSubjectId = document.getElementById('uploadSubjectSelect')?.value || '@(Model.SelectedSubjectId ?? 0)';
 
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
             formData.append('title', document.getElementById('docTitleInput').value.trim());
-            formData.append('subjectId', '@(Model.SelectedSubjectId ?? 0)');
+            formData.append('subjectId', selectedSubjectId);
 
             if (isNewChapter) {
                 const num = document.getElementById('newChapterNumber').value;
@@ -264,6 +307,15 @@
 
                 if (data.success) {
                     showUploadAlert('success', `✅ ${data.message} (${data.chunkCount} chunks — Status: ${data.status})`);
+                    if (data.subjectId) {
+                        const countEl = document.getElementById(`subject-count-${data.subjectId}`);
+                        if (countEl) {
+                            const currentCount = parseInt(countEl.getAttribute('data-count') || '0');
+                            const newCount = currentCount + 1;
+                            countEl.setAttribute('data-count', newCount);
+                            countEl.innerText = `(${newCount})`;
+                        }
+                    }
                     setTimeout(() => {
                         const modalEl = document.getElementById('uploadModal');
                         const modal = bootstrap.Modal.getInstance(modalEl);

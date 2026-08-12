@@ -37,9 +37,19 @@
 
                 <div class="mb-3">
                     <label class="form-label text-slate-300 fs-7 fw-semibold">Môn học</label>
-                    <select class="form-select fs-7" disabled>
-                        <option selected>@activeSubject?.Code – @activeSubject?.Name</option>
+                    <select id="uploadSubjectSelect" class="form-select fs-7" onchange="onUploadSubjectChange(this.value)">
+                        @foreach (var sub in Model.Subjects)
+                        {
+                            var isSel = sub.Id == Model.SelectedSubjectId;
+                            <option value="@sub.Id" data-desc="@(sub.Description ?? "")" selected="@isSel">@sub.Code – @sub.Name</option>
+                        }
                     </select>
+                    <div id="uploadSubjectDesc" class="text-slate-400 fs-8 mt-1">
+                        @if (activeSubject != null && !string.IsNullOrWhiteSpace(activeSubject.Description))
+                        {
+                            <span><i class="bi bi-info-circle"></i> @activeSubject.Description</span>
+                        }
+                    </div>
                 </div>
 
                 <div class="mb-3">
