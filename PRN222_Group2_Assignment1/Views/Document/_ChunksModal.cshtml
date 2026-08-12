@@ -1,0 +1,24 @@
+<!-- Modal 1: View Chunks Preview -->
+<div class="modal fade" id="chunksModal" tabindex="-1" aria-labelledby="chunksModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content modal-content-dark">
+            <div class="modal-header border-bottom border-slate-800 px-4 py-3">
+                <div>
+                    <h5 class="modal-title fw-bold text-white" id="chunksModalLabel">Chi tiết Extracted Chunks</h5>
+                    <div class="text-slate-400 fs-8" id="modalDocSubtitle">Loading document metadata...</div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" id="chunksModalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-slate-800 px-4 py-3">
+                <button type="button" class="btn btn-slate-800 text-slate-300 border-slate-700 rounded-3 px-4" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
