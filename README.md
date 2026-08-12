@@ -58,22 +58,24 @@ Open your browser at `https://localhost:{port}` — you'll land on the login pag
 
 ---
 
-## Default seeded account
+## Default Seeded Accounts
 
-| Field | Value |
-|---|---|
-| Email | `leader@chatbot.edu.vn` |
-| Password | `leader@123` |
-| Role | `SubjectLeader` |
+| Role | Email | Password | Access Rights |
+|---|---|---|---|
+| **Subject Leader** (Trưởng môn) | `leader@gmail.com` | `leader@123` | Upload PDF/DOCX/PPTX, Chapter CRUD, Delete Documents |
+| **Student** (Sinh viên) | `student@gmail.com` | `student@123` | View & filter indexed documents, inspect extracted chunks modal |
 
 ---
 
-## Roles
+## Key Features (Flow 1: Upload & Document Management)
 
-| Role | Actor | Access |
-|---|---|---|
-| `SubjectLeader` | Trưởng môn | Upload & manage course documents (Flow 1) |
-| `Student` | Sinh viên | Chatbot Q&A (Flow 2) |
+1. **Document Uploading**: Supports `.pdf`, `.docx`, and `.pptx` slide presentations.
+2. **Automated Extraction & Semantic Chunking**:
+   - Parses text page-by-page / slide-by-slide.
+   - Splits long text using sliding windows with ~300 character overlap to maintain context.
+   - Computes token counts per chunk for LLM readiness.
+3. **SHA256 Content Deduplication**: Automatically detects and prevents uploading duplicate files.
+4. **Subject & Chapter Management**: Organize documents under **PRN222** course chapters with dynamic creation & filtering.
 
 ---
 
