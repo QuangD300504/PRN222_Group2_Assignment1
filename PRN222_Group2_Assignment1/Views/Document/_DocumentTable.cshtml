@@ -1,0 +1,232 @@
+@model PRN222_Group2_Assignment1.ViewModels.DocumentManagementViewModel
+
+@{
+    var activeSubject = Model.Subjects.FirstOrDefault(s => s.Id == Model.SelectedSubjectId);
+    var isSubjectLeader = Context.Session.GetString("UserRole") == "SubjectLeader";
+}
+
+<div id="doc-table-region">
+    <!-- Filter Controls Bar -->
+    <div class="glass-panel p-4 mb-4">
+    <form id="filterForm" class="row g-3 align-items-end">
+        <input type="hidden" id="filterSubjectId" name="subjectId" value="@Model.SelectedSubjectId" />
+
+        <!-- Chapter -->
+        <div class="col-12 col-md-3">
+            <label class="form-label text-slate-400 fs-8 fw-semibold text-uppercase mb-1">Chương / Bài giảng</label>
+            <select id="filterChapterId" name="chapterId" class="form-select bg-slate-900 border-slate-700 text-slate-200 fs-7 rounded-3" onchange="applyFilters()">
+                <option value="">-- Tất cả các chương --</option>
+                @foreach (var ch in Model.Chapters)
+                {
+                    <option value="@ch.Id" selected="@(ch.Id == Model.SelectedChapterId)">
+                        Ch.@ch.ChapterNumber – @ch.Title
+                    </option>
+                }
+            </select>
+        </div>
+
+        <!-- File Type -->
+        <div class="col-6 col-md-3">
+            <label class="form-label text-slate-400 fs-8 fw-semibold text-uppercase mb-1">Loại File</label>
+            <select id="filterFileType" name="fileType" class="form-select bg-slate-900 border-slate-700 text-slate-200 fs-7 rounded-3" onchange="applyFilters()">
+                <option value="">Tất cả (.pdf, .docx, .pptx)</option>
+                <option value="pdf" selected="@(Model.FileTypeFilter == "pdf")">PDF (.pdf)</option>
+                <option value="docx" selected="@(Model.FileTypeFilter == "docx")">Word (.docx)</option>
+                <option value="pptx" selected="@(Model.FileTypeFilter == "pptx")">PowerPoint (.pptx)</option>
+            </select>
+        </div>
+
+        <!-- Search -->
+        <div class="col-12 col-md-6">
+            <label class="form-label text-slate-400 fs-8 fw-semibold text-uppercase mb-1">Tìm kiếm tài liệu</label>
+            <div class="input-group">
+                <span class="input-group-text bg-slate-900 border-slate-700 text-slate-400">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="text" id="filterSearch" name="search" value="@Model.SearchQuery"
+                       class="form-control bg-slate-900 border-slate-700 text-slate-200 fs-7"
+                       placeholder="Nhập tên tài liệu hoặc tên file..."
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();applyFilters();}" />
+                <button type="button" class="btn btn-iris px-3" onclick="applyFilters()">Lọc</button>
+                @if (!string.IsNullOrEmpty(Model.SearchQuery) || Model.SelectedChapterId.HasValue || !string.IsNullOrEmpty(Model.FileTypeFilter))
+                {
+                    <button type="button" class="btn btn-action-delete px-3" title="Xóa bộ lọc"
+                            onclick="clearFilters()">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                }
+            </div>
+        </div>
+    </form>
+    </div>
+
+    <!-- Document Table -->
+    <div class="glass-panel overflow-hidden">
+        <div class="px-4 py-3 border-bottom border-slate-800 d-flex align-items-center justify-content-between">
+            <h5 class="fw-bold text-white mb-0 d-flex align-items-center gap-2">
+                <i class="bi bi-files text-primary-accent"></i> Danh sách Tài liệu đã Index
+                <span class="text-slate-400 fs-7 fw-normal">@Model.Documents.Count tài liệu</span>
+            </h5>
+        </div>
+
+        @if (!Model.Documents.Any())
+        {
+            <div class="text-center py-5">
+                <div class="d-inline-flex align-items-center justify-content-center bg-slate-800 rounded-circle text-slate-500 mb-3" style="width:64px;height:64px">
+                    <i class="bi bi-folder-x fs-2"></i>
+                </div>
+                <h6 class="text-white fw-bold">Không tìm thấy tài liệu nào</h6>
+                <p class="text-slate-400 fs-7 mb-3">Thử thay đổi từ khóa tìm kiếm hoặc chọn chương khác.</p>
+                <a asp-action="Index" asp-route-subjectId="@Model.SelectedSubjectId"
+                   class="btn btn-slate-800 text-slate-200 border-slate-700 btn-sm rounded-pill px-4">
+                    Xem tất cả tài liệu môn @activeSubject?.Code
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-custom align-middle mb-0">
+                    <thead class="bg-slate-900 border-bottom border-slate-800 text-slate-400 fs-8 text-uppercase">
+                        <tr>
+                            <th class="ps-4 py-3">Tài liệu</th>
+                            <th class="py-3">Chương</th>
+                            <th class="py-3">Kích thước</th>
+                            <th class="py-3">Chunks</th>
+                            <th class="py-3">Trạng thái</th>
+                            <th class="py-3">Ngày upload</th>
+                            <th class="pe-4 py-3 text-end">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var doc in Model.Documents)
+                        {
+                            var ext = doc.FileExtension.ToLower();
+                            var badgeClass = ext switch
+                            {
+                                "pdf"  => "file-type-pdf",
+                                "docx" => "file-type-docx",
+                                "pptx" => "file-type-pptx",
+                                _      => "file-type-pdf"
+                            };
+                            double mb = doc.FileSizeBytes / (1024.0 * 1024.0);
+                            string sz = mb >= 1.0 ? $"{mb:F2} MB" : $"{doc.FileSizeBytes / 1024.0:F1} KB";
+
+                            <tr>
+                                <td class="ps-4 py-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="file-type-badge @badgeClass">@ext.ToUpper()</div>
+                                        <div>
+                                            <div class="fw-bold text-white fs-7">@doc.Title</div>
+                                            <div class="text-slate-500 fs-8">@doc.FileName</div>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <td class="py-3">
+                                    @if (doc.Chapter != null)
+                                    {
+                                        <span class="chapter-pill">
+                                            @doc.Chapter.Title
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-slate-500 fs-8">—</span>
+                                    }
+                                </td>
+
+                                <td class="py-3 text-slate-300 fs-7">@sz</td>
+
+                                <td class="py-3 text-slate-400 fs-7">
+                                    @doc.ChunkCount <span class="text-slate-600 fs-8">chunks</span>
+                                </td>
+
+                                <td class="py-3">
+                                    @if (doc.Status == "Ready")
+                                    {
+                                        <span class="status-pill status-pill-ready">
+                                            <i class="bi bi-check-circle-fill"></i> Ready
+                                        </span>
+                                    }
+                                    else if (doc.Status is "Processing" or "Pending")
+                                    {
+                                        <span class="status-pill status-pill-processing">
+                                            <i class="bi bi-hourglass-split"></i> Processing
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-pill status-pill-failed">
+                                            <i class="bi bi-exclamation-triangle-fill"></i> Failed
+                                        </span>
+                                    }
+                                </td>
+
+                                <td class="py-3 text-slate-400 fs-8">
+                                    @doc.UploadedAt.ToString("dd/MM/yy HH:mm")
+                                </td>
+
+                                <td class="pe-4 py-3 text-end">
+                                    <div class="d-flex align-items-center justify-content-end gap-2">
+                                        <button type="button"
+                                                class="btn btn-sm rounded-2 btn-action-chunks"
+                                                onclick="viewDocumentChunks(@doc.Id)">
+                                            <i class="bi bi-eye-fill"></i> Chunks
+                                        </button>
+
+                                        @if (isSubjectLeader)
+                                        {
+                                            <form asp-action="Delete" method="post" class="d-inline"
+                                                  onsubmit="return confirm('Xóa tài liệu này?');">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@doc.Id" />
+                                                <input type="hidden" name="subjectId" value="@Model.SelectedSubjectId" />
+                                                <button type="submit" class="btn btn-sm rounded-2 btn-action-delete" title="Xóa">
+                                                    <i class="bi bi-trash-fill"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+    function applyFilters() {
+        const subjectId = document.getElementById('filterSubjectId')?.value
+            || (typeof _activeSubjectId !== 'undefined' ? _activeSubjectId : 0);
+        const chapterId = document.getElementById('filterChapterId')?.value ?? '';
+        const fileType  = document.getElementById('filterFileType')?.value ?? '';
+        const search    = document.getElementById('filterSearch')?.value ?? '';
+
+        const params = new URLSearchParams({ subjectId });
+        if (chapterId) params.set('chapterId', chapterId);
+        if (fileType)  params.set('fileType', fileType);
+        if (search)    params.set('search', search);
+
+        const region = document.getElementById('doc-partial-region');
+        region.style.opacity = '0.4';
+        fetch(`/Document/GetDocumentsPartial?${params}`)
+            .then(r => r.text())
+            .then(html => { region.innerHTML = html; region.style.opacity = '1'; })
+            .catch(() => { region.style.opacity = '1'; });
+    }
+
+    function clearFilters() {
+        const subjectId = document.getElementById('filterSubjectId')?.value
+            || (typeof _activeSubjectId !== 'undefined' ? _activeSubjectId : 0);
+        const region = document.getElementById('doc-partial-region');
+        region.style.opacity = '0.4';
+        fetch(`/Document/GetDocumentsPartial?subjectId=${subjectId}`)
+            .then(r => r.text())
+            .then(html => { region.innerHTML = html; region.style.opacity = '1'; })
+            .catch(() => { region.style.opacity = '1'; });
+    }
+</script>
