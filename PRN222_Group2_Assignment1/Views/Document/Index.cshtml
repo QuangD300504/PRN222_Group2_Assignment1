@@ -14,10 +14,6 @@
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
         <div>
             <h2 class="fw-bold text-white mb-0">Quản lý Tài liệu &amp; Embedded Chunks</h2>
-            @if (activeSubject != null && !string.IsNullOrWhiteSpace(activeSubject.Description))
-            {
-                <p class="text-slate-400 fs-7 mb-0 mt-1"><i class="bi bi-info-circle"></i> @activeSubject.Description</p>
-            }
         </div>
 
         <div class="d-flex align-items-center gap-2">
@@ -39,42 +35,55 @@
 
 
     <!-- Subject Selection Pills & Create Subject Bar -->
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4 bg-slate-850 p-3 rounded-3 border border-slate-800">
-        <div class="d-flex flex-wrap align-items-center gap-2">
-            <span class="text-slate-400 fs-7 fw-medium me-2"><i class="bi bi-book-half text-primary-accent"></i> Môn học:</span>
-            @foreach (var sub in Model.Subjects)
+    <div class="d-flex flex-column gap-2 mb-4 bg-slate-850 p-3 rounded-3 border border-slate-800">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="text-slate-400 fs-7 fw-medium me-2"><i class="bi bi-book-half text-primary-accent"></i> Môn học:</span>
+                @foreach (var sub in Model.Subjects)
+                {
+                    var isSelected = Model.SelectedSubjectId == sub.Id;
+                    var docCount = sub.Documents?.Count ?? 0;
+                    <button type="button"
+                            class="btn btn-sm rounded-pill px-3 py-1-5 fw-semibold transition-all @(isSelected ? "btn-primary bg-gradient-primary border-0 text-white shadow-sm" : "btn-slate-800 text-slate-300 border-slate-700 hover-slate-700")"
+                            data-subject-id="@sub.Id"
+                            onclick="switchSubject(@sub.Id)">
+                        <span>@sub.Code</span>
+                        <span class="doc-count opacity-75 ms-1 fs-8" id="subject-count-@sub.Id" data-count="@docCount">(@docCount)</span>
+                    </button>
+                }
+            </div>
+
+            @if (isSubjectLeader)
             {
-                var isSelected = Model.SelectedSubjectId == sub.Id;
-                var docCount = sub.Documents?.Count ?? 0;
-                <button type="button"
-                        class="btn btn-sm rounded-pill px-3 py-1-5 fw-semibold transition-all @(isSelected ? "btn-primary bg-gradient-primary border-0 text-white shadow-sm" : "btn-slate-800 text-slate-300 border-slate-700 hover-slate-700")"
-                        data-subject-id="@sub.Id"
-                        onclick="switchSubject(@sub.Id)">
-                    <span>@sub.Code</span>
-                    <span class="doc-count opacity-75 ms-1 fs-8" id="subject-count-@sub.Id" data-count="@docCount">(@docCount)</span>
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1-5 fw-semibold d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#createSubjectModal">
+                    <i class="bi bi-plus-lg"></i>
+                    <span>Thêm môn học mới</span>
                 </button>
             }
         </div>
 
-        @if (isSubjectLeader)
-        {
-            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1-5 fw-semibold d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#createSubjectModal">
-                <i class="bi bi-plus-lg"></i>
-                <span>Thêm môn học mới</span>
-            </button>
+        @{ var initDesc = activeSubject?.Description; }
+        @{
+            var hasInfo = activeSubject != null && (!string.IsNullOrWhiteSpace(activeSubject.Name) || !string.IsNullOrWhiteSpace(initDesc));
         }
-    </div>
-
-    <!-- Active Subject Description Callout -->
-    @if (activeSubject != null && !string.IsNullOrWhiteSpace(activeSubject.Description))
-    {
-        <div id="subjectDescCallout" class="bg-slate-850 border border-slate-800 text-slate-300 rounded-3 py-2-5 px-3 mb-4 d-flex align-items-center gap-2 fs-7 shadow-sm">
-            <i class="bi bi-info-circle-fill text-primary-accent fs-6"></i>
+        <div id="subjectDescCallout" class="@(hasInfo ? "" : "d-none ")d-flex align-items-start gap-2 border-top border-slate-800 pt-2 mt-1">
+            <i class="bi bi-info-circle text-primary-accent flex-shrink-0" style="margin-top:2px"></i>
             <div>
-                <strong class="text-white">Mô tả môn học (@activeSubject.Code):</strong> @activeSubject.Description
+                <div class="fw-semibold text-slate-200 fs-7">
+                    <span class="badge bg-slate-800 text-primary-accent border border-slate-700 me-1 fs-8" id="subjectCodeBadge">@activeSubject?.Code</span>
+                    <span id="subjectNameText">@activeSubject?.Name</span>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(initDesc))
+                {
+                    <div class="text-slate-400 fs-8 mt-0-5" id="subjectDescText">@initDesc</div>
+                }
+                @if (string.IsNullOrWhiteSpace(initDesc))
+                {
+                    <div class="text-slate-400 fs-8 mt-0-5 d-none" id="subjectDescText"></div>
+                }
             </div>
         </div>
-    }
+    </div>
 
     <!-- Partial region -->
     <div id="doc-partial-region">
@@ -120,10 +129,59 @@
             </div>
         </div>
     </div>
+
+</div>
+
+@await Html.PartialAsync("_ChunksModal")
+@await Html.PartialAsync("_UploadModal", Model)
+<div id="manageSubjectModalRegion">
+    @await Html.PartialAsync("_ManageSubjectModal", Model)
+</div>
+
+<!-- Create Subject Modal -->
+<div class="modal fade" id="createSubjectModal" tabindex="-1" aria-labelledby="createSubjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-content-dark">
+            <div class="modal-header border-bottom border-slate-800 px-4 py-3">
+                <h5 class="modal-title fw-bold text-white fs-6 d-flex align-items-center gap-2" id="createSubjectModalLabel">
+                    <i class="bi bi-journal-plus text-primary-accent"></i>
+                    <span>Tạo Môn Học Mới</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="createSubjectAlert" class="alert alert-danger d-none rounded-3 fs-7 py-2 px-3"></div>
+                <div class="mb-3">
+                    <label class="form-label text-slate-300 fs-7 fw-medium">Mã Môn Học <span class="text-danger">*</span></label>
+                    <input type="text" id="newSubjectCode" class="form-control form-control-dark" placeholder="Ví dụ: PRN222" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-slate-300 fs-7 fw-medium">Tên Môn Học <span class="text-danger">*</span></label>
+                    <input type="text" id="newSubjectName" class="form-control form-control-dark" placeholder="Ví dụ: C# &amp; .NET Application Development" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-slate-300 fs-7 fw-medium">Mô tả Môn Học</label>
+                    <textarea id="newSubjectDesc" class="form-control form-control-dark" rows="3" placeholder="Nhập mô tả môn học..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-slate-800 px-4 py-3">
+                <button type="button" class="btn btn-slate-800 text-slate-300 border-slate-700 rounded-3 px-3 py-2 fs-7 fw-medium" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary bg-gradient-primary border-0 rounded-3 px-4 py-2 fs-7 fw-semibold" onclick="createSubjectSubmit()">Tạo Môn Học</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @section Scripts {
     <script>
+        // Subject info map for client-side update on pill switch
+        const _subjectDescriptions = {
+            @foreach (var sub in Model.Subjects)
+            {
+                @: @sub.Id: { code: @Json.Serialize(sub.Code), name: @Json.Serialize(sub.Name ?? ""), desc: @Json.Serialize(sub.Description ?? "") },
+            }
+        };
+
         let _activeSubjectId = @(Model.SelectedSubjectId ?? 0);
 
         function switchSubject(subjectId) {
@@ -141,6 +199,24 @@
                     btn.classList.add('btn-subject-inactive');
                 }
             });
+
+            // Update subject info callout
+            const callout = document.getElementById('subjectDescCallout');
+            const info = _subjectDescriptions[subjectId];
+            if (info && (info.name || info.desc)) {
+                document.getElementById('subjectCodeBadge').textContent = info.code;
+                document.getElementById('subjectNameText').textContent = info.name;
+                const descEl = document.getElementById('subjectDescText');
+                if (info.desc) {
+                    descEl.textContent = info.desc;
+                    descEl.classList.remove('d-none');
+                } else {
+                    descEl.classList.add('d-none');
+                }
+                callout.classList.remove('d-none');
+            } else {
+                callout.classList.add('d-none');
+            }
 
             const region = document.getElementById('doc-partial-region');
             region.style.opacity = '0.4';
@@ -372,9 +448,14 @@
 
         async function saveSubjectInfo() {
             const subjectId = document.getElementById('manageSubjectId')?.value || _activeSubjectId;
+            const code = document.getElementById('subjectCodeInput').value.trim().toUpperCase();
             const name = document.getElementById('subjectNameInput').value.trim();
             const desc = document.getElementById('subjectDescInput').value.trim();
 
+            if (!code) {
+                showSubjectAlert('danger', 'Mã môn học không được để trống.');
+                return;
+            }
             if (!name) {
                 showSubjectAlert('danger', 'Tên môn học không được để trống.');
                 return;
@@ -382,6 +463,7 @@
 
             const formData = new FormData();
             formData.append('subjectId', subjectId);
+            formData.append('code', code);
             formData.append('name', name);
             formData.append('description', desc);
             formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');

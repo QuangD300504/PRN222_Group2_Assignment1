@@ -22,7 +22,7 @@ public interface IDocumentService
 
     Task<Chapter> GetOrCreateChapterAsync(int subjectId, int chapterNumber, string title);
 
-    Task<(bool success, string message)> UpdateSubjectAsync(int subjectId, string name, string? description);
+    Task<(bool success, string message)> UpdateSubjectAsync(int subjectId, string code, string name, string? description);
 
     Task<(bool success, string message, Subject? subject)> CreateSubjectAsync(string code, string name, string? description);
 

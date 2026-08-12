@@ -264,11 +264,18 @@ public class DocumentService(AppDbContext context, IWebHostEnvironment env) : ID
         return chapter;
     }
 
-    public async Task<(bool success, string message)> UpdateSubjectAsync(int subjectId, string name, string? description)
+    public async Task<(bool success, string message)> UpdateSubjectAsync(int subjectId, string code, string name, string? description)
     {
         var subject = await context.Subjects.FindAsync(subjectId);
         if (subject is null) return (false, "Subject not found.");
 
+        var cleanCode = code.Trim().ToUpper();
+        var codeConflict = await context.Subjects
+            .AnyAsync(s => s.Code.ToLower() == cleanCode.ToLower() && s.Id != subjectId);
+        if (codeConflict)
+            return (false, $"Mã môn học \"{cleanCode}\" đã được dùng bởi môn học khác.");
+
+        subject.Code = cleanCode;
         subject.Name = name.Trim();
         subject.Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         await context.SaveChangesAsync();

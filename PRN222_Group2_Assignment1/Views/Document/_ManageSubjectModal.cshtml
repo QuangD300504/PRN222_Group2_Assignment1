@@ -23,6 +23,10 @@
                         <i class="bi bi-book-fill text-primary-accent"></i> Thông tin Môn học
                     </h6>
                     <div class="mb-3">
+                        <label class="form-label text-slate-300 fs-7 fw-semibold">Mã môn học</label>
+                        <input type="text" id="subjectCodeInput" class="form-control fs-7 text-uppercase" value="@activeSubject?.Code" maxlength="20" />
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label text-slate-300 fs-7 fw-semibold">Tên môn học</label>
                         <input type="text" id="subjectNameInput" class="form-control fs-7" value="@activeSubject?.Name" />
                     </div>

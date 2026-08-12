@@ -80,15 +80,18 @@ public class DocumentController(IDocumentService documentService, IWebHostEnviro
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateSubject(int subjectId, string name, string? description)
+    public async Task<IActionResult> UpdateSubject(int subjectId, string code, string name, string? description)
     {
         if (HttpContext.Session.GetString("UserRole") != "SubjectLeader")
             return Json(new { success = false, message = "Only Subject Leaders can edit subject details." });
 
+        if (string.IsNullOrWhiteSpace(code))
+            return Json(new { success = false, message = "Mã môn học không được để trống." });
+
         if (string.IsNullOrWhiteSpace(name))
             return Json(new { success = false, message = "Tên môn học không được để trống." });
 
-        var (success, message) = await documentService.UpdateSubjectAsync(subjectId, name, description);
+        var (success, message) = await documentService.UpdateSubjectAsync(subjectId, code, name, description);
         return Json(new { success, message });
     }
 
