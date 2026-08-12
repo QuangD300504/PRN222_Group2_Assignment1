@@ -1,0 +1,434 @@
+@model PRN222_Group2_Assignment1.ViewModels.DocumentManagementViewModel
+
+@{
+    ViewData["Title"] = "Quản lý Tài liệu & Indexing";
+    var activeSubject = Model.Subjects.FirstOrDefault(s => s.Id == Model.SelectedSubjectId);
+    var isSubjectLeader = Context.Session.GetString("UserRole") == "SubjectLeader";
+}
+
+@Html.AntiForgeryToken()
+
+
+<div class="container-fluid px-4 py-4">
+    <!-- Header Section -->
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold text-white mb-0">Quản lý Tài liệu &amp; Embedded Chunks</h2>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            @if (isSubjectLeader)
+            {
+                <button type="button" class="btn btn-slate-800 text-slate-300 border-slate-700 rounded-3 px-3 py-2 fw-semibold d-flex align-items-center gap-2" onclick="openManageSubjectModal()">
+                    <i class="bi bi-gear-fill text-primary-accent fs-5"></i>
+                    <span>Quản lý Môn &amp; Chương</span>
+                </button>
+
+                <button type="button" class="btn btn-primary bg-gradient-primary border-0 rounded-3 px-4 py-2 fw-semibold d-flex align-items-center gap-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                    <i class="bi bi-cloud-arrow-up-fill fs-5"></i>
+                    <span>Tải lên tài liệu mới</span>
+                </button>
+            }
+        </div>
+    </div>
+
+
+
+    <!-- Partial region -->
+    <div id="doc-partial-region">
+        @await Html.PartialAsync("_DocumentTable", Model)
+    </div>
+</div>
+
+@await Html.PartialAsync("_ChunksModal")
+@await Html.PartialAsync("_UploadModal", Model)
+<div id="manageSubjectModalRegion">
+    @await Html.PartialAsync("_ManageSubjectModal", Model)
+</div>
+
+@section Scripts {
+    <script>
+        let _activeSubjectId = @(Model.SelectedSubjectId ?? 0);
+
+        function switchSubject(subjectId) {
+            if (subjectId === _activeSubjectId) return;
+            _activeSubjectId = subjectId;
+
+            // Update pill active state
+            document.querySelectorAll('[data-subject-id]').forEach(btn => {
+                const isActive = parseInt(btn.dataset.subjectId) === subjectId;
+                if (isActive) {
+                    btn.classList.remove('btn-subject-inactive');
+                    btn.classList.add('btn-subject-active');
+                } else {
+                    btn.classList.remove('btn-subject-active');
+                    btn.classList.add('btn-subject-inactive');
+                }
+            });
+
+            const region = document.getElementById('doc-partial-region');
+            region.style.opacity = '0.4';
+
+            fetch(`/Document/GetDocumentsPartial?subjectId=${subjectId}`)
+                .then(r => r.text())
+                .then(html => {
+                    region.innerHTML = html;
+                    region.style.opacity = '1';
+                })
+                .catch(() => { region.style.opacity = '1'; });
+        }
+
+        function viewDocumentChunks(docId) {
+            const modal = new bootstrap.Modal(document.getElementById('chunksModal'));
+            const modalBody = document.getElementById('chunksModalBody');
+            const modalSubtitle = document.getElementById('modalDocSubtitle');
+
+            modalBody.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div class="text-slate-400 fs-8 mt-2">Đang tải thông tin chunks...</div>
+                </div>`;
+            modal.show();
+
+            fetch(`/Document/GetChunks?id=${docId}`)
+                .then(res => {
+                    if (!res.ok) throw new Error('Document not found');
+                    return res.json();
+                })
+                .then(data => {
+                    modalSubtitle.innerHTML = `<span class="text-slate-200 fw-semibold">${data.title}</span> • ${data.subjectName} (${data.chapterTitle}) • ${data.chunkCount} Chunks`;
+
+                    if (!data.chunks || data.chunks.length === 0) {
+                        modalBody.innerHTML = `<div class="text-center py-4 text-slate-400">Chưa có chunk nào được trích xuất cho tài liệu này.</div>`;
+                        return;
+                    }
+
+                    let html = `<div class="mb-3 d-flex align-items-center justify-content-between bg-slate-850 p-3 rounded-3 border border-slate-800">
+                        <div>
+                            <span class="badge bg-primary-subtle text-primary-accent me-2">${data.fileExtension}</span>
+                            <span class="text-slate-300 fs-7">${data.fileName} (${data.formattedSize})</span>
+                        </div>
+                        <span class="status-pill status-pill-ready"><i class="bi bi-check-circle-fill"></i> ${data.status}</span>
+                    </div>`;
+
+                    data.chunks.forEach(c => {
+                        html += `
+                            <div class="chunk-card">
+                                <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom border-slate-800">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-slate-800 text-primary-accent border border-slate-700 fs-8">Chunk #${c.chunkIndex}</span>
+                                        <span class="text-slate-400 fs-8"><i class="bi bi-journal-page"></i> Trang ${c.pageNumber}</span>
+                                        ${c.heading ? `<span class="badge bg-slate-800 text-slate-300 fs-8">${c.heading}</span>` : ''}
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="text-slate-400 fs-8">${c.tokenCount} Tokens</span>
+                                        ${c.hasEmbedding ? `<span class="badge bg-emerald-500-subtle text-emerald-400 fs-8"><i class="bi bi-vector-pen"></i> Embedded</span>` : ''}
+                                    </div>
+                                </div>
+                                <div class="chunk-content">${escapeHtml(c.content)}</div>
+                            </div>
+                        `;
+                    });
+
+                    modalBody.innerHTML = html;
+                })
+                .catch(err => {
+                    modalBody.innerHTML = `<div class="alert alert-danger">Có lỗi xảy ra khi tải dữ liệu chunk: ${err.message}</div>`;
+                });
+        }
+
+        function updateFilePreview(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                document.getElementById('dropzoneContent').classList.add('d-none');
+                document.getElementById('selectedFileInfo').classList.remove('d-none');
+                document.getElementById('selectedFileName').innerText = file.name;
+                document.getElementById('selectedFileSize').innerText = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+                if (!document.getElementById('docTitleInput').value)
+                    document.getElementById('docTitleInput').value = file.name.replace(/\.[^/.]+$/, '');
+            }
+        }
+
+        function onChapterChange(select) {
+            const newChapterForm = document.getElementById('newChapterForm');
+            newChapterForm.classList.toggle('d-none', select.value !== '__new__');
+        }
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        async function submitUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const alertEl = document.getElementById('uploadAlert');
+            const btn = document.getElementById('uploadSubmitBtn');
+
+            if (!fileInput.files || !fileInput.files[0]) {
+                showUploadAlert('danger', 'Vui lòng chọn file PDF, DOCX hoặc PPTX.');
+                return;
+            }
+
+            const chapterSelect = document.getElementById('chapterSelect');
+            const isNewChapter = chapterSelect.value === '__new__';
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('title', document.getElementById('docTitleInput').value.trim());
+            formData.append('subjectId', '@(Model.SelectedSubjectId ?? 0)');
+
+            if (isNewChapter) {
+                const num = document.getElementById('newChapterNumber').value;
+                const title = document.getElementById('newChapterTitle').value.trim();
+                if (!num || !title) {
+                    showUploadAlert('danger', 'Vui lòng nhập số chương và tên chương.');
+                    return;
+                }
+                formData.append('newChapterNumber', num);
+                formData.append('newChapterTitle', title);
+            } else if (chapterSelect.value) {
+                formData.append('chapterId', chapterSelect.value);
+            }
+
+            // Add antiforgery token
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Đang xử lý...';
+
+            try {
+                const resp = await fetch('/Document/Upload', { method: 'POST', body: formData });
+                const data = await resp.json();
+
+                if (data.success) {
+                    showUploadAlert('success', `✅ ${data.message} (${data.chunkCount} chunks — Status: ${data.status})`);
+                    setTimeout(() => {
+                        const modalEl = document.getElementById('uploadModal');
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) modal.hide();
+
+                        // Reset form state
+                        document.getElementById('fileInput').value = '';
+                        document.getElementById('docTitleInput').value = '';
+                        document.getElementById('chapterSelect').value = '';
+                        document.getElementById('dropzoneContent').classList.remove('d-none');
+                        document.getElementById('selectedFileInfo').classList.add('d-none');
+                        document.getElementById('uploadAlert').classList.add('d-none');
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-cpu-fill"></i> Xử lý &amp; Index Document';
+
+                        // Dynamically refresh table via AJAX (no full page reload)
+                        if (typeof applyFilters === 'function') {
+                            applyFilters();
+                        } else {
+                            window.location.reload();
+                        }
+                    }, 1200);
+                } else {
+                    showUploadAlert('danger', `❌ ${data.message}`);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-cpu-fill"></i> Xử lý &amp; Index Document';
+                }
+            } catch (err) {
+                showUploadAlert('danger', 'Lỗi kết nối. Vui lòng thử lại.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-cpu-fill"></i> Xử lý &amp; Index Document';
+            }
+        }
+
+        function showUploadAlert(type, msg) {
+            const el = document.getElementById('uploadAlert');
+            el.className = `alert alert-${type} rounded-3 fs-7`;
+            el.innerHTML = msg;
+            el.classList.remove('d-none');
+        }
+
+        async function openManageSubjectModal() {
+            try {
+                const resp = await fetch('/Document/ManageSubjectModalPartial?subjectId=' + _activeSubjectId);
+                const html = await resp.text();
+                document.getElementById('manageSubjectModalRegion').innerHTML = html;
+                const modalEl = document.getElementById('manageSubjectModal');
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            } catch (err) {
+                console.error('Failed to load manage subject modal', err);
+            }
+        }
+
+        async function saveSubjectInfo() {
+            const subjectId = document.getElementById('manageSubjectId')?.value || _activeSubjectId;
+            const name = document.getElementById('subjectNameInput').value.trim();
+            const desc = document.getElementById('subjectDescInput').value.trim();
+
+            if (!name) {
+                showSubjectAlert('danger', 'Tên môn học không được để trống.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('subjectId', subjectId);
+            formData.append('name', name);
+            formData.append('description', desc);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            try {
+                const resp = await fetch('/Document/UpdateSubject', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.success) {
+                    showSubjectAlert('success', '✅ ' + data.message);
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showSubjectAlert('danger', '❌ ' + data.message);
+                }
+            } catch (err) {
+                showSubjectAlert('danger', 'Lỗi hệ thống. Vui lòng thử lại.');
+            }
+        }
+
+        async function deleteSubjectItem(id, code) {
+            const subjectId = id || document.getElementById('manageSubjectId')?.value || _activeSubjectId;
+            if (!subjectId) return;
+            if (!confirm(`⚠️ CẢNH BÁO: Bạn có chắc chắn muốn XÓA môn học "${code}"?\nTất cả chương và tài liệu thuộc môn học này sẽ bị XÓA VĨNH VIỄN khỏi hệ thống!`)) return;
+
+            const formData = new FormData();
+            formData.append('id', subjectId);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            try {
+                const resp = await fetch('/Document/DeleteSubject', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.success) {
+                    showSubjectAlert('success', '✅ ' + data.message);
+                    setTimeout(() => {
+                        window.location.href = '/Document';
+                    }, 1000);
+                } else {
+                    showSubjectAlert('danger', '❌ ' + data.message);
+                }
+            } catch (err) {
+                showSubjectAlert('danger', 'Lỗi hệ thống. Vui lòng thử lại.');
+            }
+        }
+
+        function editChapter(id, num, title, summary) {
+            document.getElementById('editChapterId').value = id;
+            document.getElementById('editChapterNum').value = num;
+            document.getElementById('editChapterTitleInput').value = title;
+            document.getElementById('editChapterSummaryInput').value = summary;
+            document.getElementById('chapterEditTitle').innerHTML = '<i class="bi bi-pencil-square text-primary-accent"></i> Chỉnh sửa chương ' + num;
+        }
+
+        function resetChapterForm() {
+            document.getElementById('editChapterId').value = '';
+            document.getElementById('editChapterNum').value = '';
+            document.getElementById('editChapterTitleInput').value = '';
+            document.getElementById('editChapterSummaryInput').value = '';
+            document.getElementById('chapterEditTitle').innerHTML = '<i class="bi bi-plus-circle text-primary-accent"></i> Thêm chương mới';
+        }
+
+        async function saveChapterItem() {
+            const id = document.getElementById('editChapterId').value;
+            const num = document.getElementById('editChapterNum').value;
+            const title = document.getElementById('editChapterTitleInput').value.trim();
+            const summary = document.getElementById('editChapterSummaryInput').value.trim();
+
+            if (!num || !title) {
+                showSubjectAlert('danger', 'Vui lòng nhập số chương và tiêu đề chương.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('subjectId', _activeSubjectId);
+            if (id) formData.append('id', id);
+            formData.append('chapterNumber', num);
+            formData.append('title', title);
+            formData.append('summary', summary);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            try {
+                const resp = await fetch('/Document/SaveChapter', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.success) {
+                    showSubjectAlert('success', '✅ ' + data.message);
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showSubjectAlert('danger', '❌ ' + data.message);
+                }
+            } catch (err) {
+                showSubjectAlert('danger', 'Lỗi hệ thống. Vui lòng thử lại.');
+            }
+        }
+
+        async function deleteChapterItem(id) {
+            if (!confirm('Bạn có chắc chắn muốn xóa chương này? Tất cả tài liệu trong chương sẽ chuyển về trạng thái không phân chương.')) return;
+
+            const formData = new FormData();
+            formData.append('id', id);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            try {
+                const resp = await fetch('/Document/DeleteChapter', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.success) {
+                    showSubjectAlert('success', '✅ ' + data.message);
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showSubjectAlert('danger', '❌ ' + data.message);
+                }
+            } catch (err) {
+                showSubjectAlert('danger', 'Lỗi hệ thống. Vui lòng thử lại.');
+            }
+        }
+
+        function showSubjectAlert(type, msg) {
+            const el = document.getElementById('subjectAlert');
+            el.className = `alert alert-${type} alert-dismissible fade show py-2 px-3 fs-7 rounded-3`;
+            el.innerHTML = msg;
+            el.classList.remove('d-none');
+        }
+
+        async function createSubjectSubmit() {
+            const code = document.getElementById('newSubjectCode').value.trim();
+            const name = document.getElementById('newSubjectName').value.trim();
+            const desc = document.getElementById('newSubjectDesc').value.trim();
+            const alertEl = document.getElementById('createSubjectAlert');
+
+            if (!code || !name) {
+                alertEl.className = 'alert alert-danger rounded-3 fs-7 py-2 px-3';
+                alertEl.innerHTML = 'Vui lòng nhập Mã môn học và Tên môn học.';
+                alertEl.classList.remove('d-none');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('code', code);
+            formData.append('name', name);
+            formData.append('description', desc);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            try {
+                const resp = await fetch('/Document/CreateSubject', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.success) {
+                    alertEl.className = 'alert alert-success rounded-3 fs-7 py-2 px-3';
+                    alertEl.innerHTML = '✅ ' + data.message;
+                    alertEl.classList.remove('d-none');
+                    setTimeout(() => {
+                        window.location.href = '/Document?subjectId=' + data.subjectId;
+                    }, 1000);
+                } else {
+                    alertEl.className = 'alert alert-danger rounded-3 fs-7 py-2 px-3';
+                    alertEl.innerHTML = '❌ ' + data.message;
+                    alertEl.classList.remove('d-none');
+                }
+            } catch (err) {
+                alertEl.className = 'alert alert-danger rounded-3 fs-7 py-2 px-3';
+                alertEl.innerHTML = 'Lỗi hệ thống. Vui lòng thử lại.';
+                alertEl.classList.remove('d-none');
+            }
+        }
+    </script>
+}
