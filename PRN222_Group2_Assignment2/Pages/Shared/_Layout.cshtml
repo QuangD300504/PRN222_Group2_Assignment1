@@ -1,51 +1,113 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+@{
+    var userEmail = Context.Session.GetString("UserEmail");
+    var userRole = Context.Session.GetString("UserRole");
+    var userId = Context.Session.GetString("UserId");
+    var isLoggedIn = !string.IsNullOrEmpty(userEmail);
+}
+<!DOCTYPE html>
+<html lang="vi" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - PRN222_Group2_Assignment2</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <title>@ViewData["Title"] - RAG Syllabus Knowledge Base (Razor Pages)</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 CSS & Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Custom Theme CSS -->
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/PRN222_Group2_Assignment2.styles.css" asp-append-version="true" />
 </head>
 <body>
+    <!-- Top Global Header Navbar -->
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container">
-                <a class="navbar-brand" asp-area="" asp-page="/Index">PRN222_Group2_Assignment2</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
+        <nav class="navbar navbar-expand-lg navbar-dark navbar-custom py-2.5">
+            <div class="container-fluid px-4">
+                <!-- Brand Logo -->
+                <a class="navbar-brand d-flex align-items-center gap-2.5" href="/Document/Index">
+                    <div class="brand-icon-box rounded-3 d-flex align-items-center justify-content-center">
+                        <i class="bi bi-cpu-fill fs-6"></i>
+                    </div>
+                    <div class="d-flex flex-column">
+                        <span class="fw-bold tracking-tight text-white fs-6 lh-1">RAG Knowledge Engine</span>
+                        <span class="fs-8 text-slate-400 fw-medium">Syllabus Indexing System (Razor Pages)</span>
+                    </div>
+                </a>
+
+                <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
-                        </li>
-                    </ul>
+
+                <div class="collapse navbar-collapse" id="navbarMain">
+                    @if (isLoggedIn)
+                    {
+                        <!-- Primary Navigation Links -->
+                        <ul class="navbar-nav me-auto ms-4 mb-2 mb-lg-0 gap-1">
+                            <li class="nav-item">
+                                <a class="nav-link px-3 py-1-5 rounded-3 fs-7 fw-medium d-flex align-items-center gap-2 @(ViewData["ActivePage"]?.ToString() == "Document" ? "active bg-slate-800 text-white" : "text-slate-400 hover-text-white")"
+                                   href="/Document/Index">
+                                    <i class="bi bi-folder-symlink"></i> Quản lý Tài liệu
+                                </a>
+                            </li>
+                        </ul>
+
+                        <!-- User Profile Pill & Logout -->
+                        <div class="d-flex align-items-center gap-3 ms-auto">
+                            <div class="dropdown">
+                                <button class="btn user-profile-btn rounded-pill px-3 py-1.5 fs-7 d-flex align-items-center gap-2"
+                                        type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <div class="avatar-sm rounded-circle bg-primary-accent d-flex align-items-center justify-content-center fw-bold">
+                                        @(userEmail?.Substring(0, 1).ToUpper() ?? "U")
+                                    </div>
+                                    <span class="fw-medium user-name">@userEmail</span>
+                                    <span class="badge rounded-pill bg-slate-800 text-slate-300 border border-slate-700 fs-8 fw-semibold px-2 py-0.5">
+                                        @userRole
+                                    </span>
+                                    <i class="bi bi-chevron-down fs-8 text-slate-400 ms-1"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-lg user-dropdown-menu mt-2">
+                                    <li class="px-3 py-2 border-bottom border-slate-800">
+                                        <div class="fs-8 text-slate-400">Đăng nhập với vai trò</div>
+                                        <div class="fw-bold fs-7 text-white mt-0.5">@userRole</div>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item px-3 py-2 fs-7 d-flex align-items-center gap-2 text-danger mt-1" href="/Auth/Logout">
+                                            <i class="bi bi-box-arrow-right"></i> Đăng xuất
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="ms-auto">
+                            <a href="/Auth/Login" class="btn btn-sm btn-primary rounded-pill px-3 py-1.5">
+                                <i class="bi bi-box-arrow-in-right"></i> Đăng nhập
+                            </a>
+                        </div>
+                    }
                 </div>
             </div>
         </nav>
     </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - PRN222_Group2_Assignment2 - <a asp-area="" asp-page="/Privacy">Privacy</a>
+    <!-- Main Content Container -->
+    <main role="main" class="flex-grow-1 py-4">
+        @RenderBody()
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer mt-auto py-3 border-top border-slate-800 bg-slate-900">
+        <div class="container-fluid px-4 text-center text-slate-400 fs-8">
+            PRN222 Group 2 - Assignment 2 (Razor Pages Architecture) &copy; 2026
         </div>
     </footer>
 
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
-
+    <!-- Bootstrap 5 Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/bootstrap.bundle.min.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
