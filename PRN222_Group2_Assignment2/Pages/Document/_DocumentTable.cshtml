@@ -1,0 +1,102 @@
+@using System.Text.Encodings.Web
+@model PRN222_Group2_Assignment1.ViewModels.DocumentManagementViewModel
+@{
+    var userRole = Context.Session.GetString("UserRole");
+    var isSubjectLeader = userRole == "SubjectLeader";
+}
+
+<div class="table-responsive">
+    <table class="table table-custom align-middle mb-0">
+        <thead>
+            <tr class="fs-8 text-slate-400 text-uppercase tracking-wider border-bottom border-slate-800">
+                <th class="ps-4 py-3">Loại / Tên tài liệu</th>
+                <th class="py-3">Môn học</th>
+                <th class="py-3">Chương / Phạm vi</th>
+                <th class="py-3 text-center">Đoạn văn (Chunks)</th>
+                <th class="py-3 text-center">Trạng thái</th>
+                <th class="py-3 text-end pe-4">Thao tác</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Documents == null || !Model.Documents.Any())
+            {
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-slate-400">
+                        <i class="bi bi-inbox fs-1 d-block mb-2 text-slate-500"></i>
+                        <span>Chưa có tài liệu nào trong danh mục được chọn.</span>
+                    </td>
+                </tr>
+            }
+            else
+            {
+                foreach (var doc in Model.Documents)
+                {
+                    var fileExt = (doc.FileExtension ?? "").ToLowerInvariant();
+                    var badgeClass = fileExt switch
+                    {
+                        "pdf" or ".pdf" => "file-type-pdf",
+                        "docx" or "doc" or ".docx" or ".doc" => "file-type-docx",
+                        "pptx" or "ppt" or ".pptx" or ".ppt" => "file-type-pptx",
+                        _ => "file-type-docx"
+                    };
+                    var iconClass = fileExt switch
+                    {
+                        "pdf" or ".pdf" => "bi-file-earmark-pdf",
+                        "docx" or "doc" or ".docx" or ".doc" => "bi-file-earmark-word",
+                        "pptx" or "ppt" or ".pptx" or ".ppt" => "bi-file-earmark-slides",
+                        _ => "bi-file-earmark-text"
+                    };
+
+                    <tr>
+                        <td class="ps-4 py-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="file-type-badge @badgeClass">
+                                    <i class="bi @iconClass fs-5"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-semibold text-white fs-7 mb-0.5">@doc.Title</div>
+                                    <div class="fs-8 text-slate-400 font-monospace">@doc.FileName • @((doc.FileSizeBytes / (1024.0 * 1024.0)).ToString("F2")) MB</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-slate-800 text-slate-300 border border-slate-700 fs-8 font-monospace px-2.5 py-1">
+                                @(doc.Subject?.Code ?? "N/A")
+                            </span>
+                        </td>
+                        <td>
+                            <span class="chapter-pill">
+                                @(doc.Chapter == null ? "Tất cả chương" : $"Chương {doc.Chapter.ChapterNumber}: {doc.Chapter.Title}")
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge rounded-pill bg-slate-800 text-primary-accent border border-slate-700 fs-8 font-monospace px-2.5 py-1">
+                                <i class="bi bi-cpu me-1"></i>@doc.ChunkCount chunks
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <span class="status-pill status-pill-ready">
+                                <i class="bi bi-check-circle-fill"></i> Đã trích xuất
+                            </span>
+                        </td>
+                        <td class="text-end pe-4">
+                            <div class="d-inline-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-action-chunks rounded-3 fs-8 px-2.5 py-1 d-flex align-items-center gap-1"
+                                        onclick="openChunksModal(@doc.Id, '@JavaScriptEncoder.Default.Encode(doc.Title)')">
+                                    <i class="bi bi-eye"></i> Xem Chunks
+                                </button>
+                                @if (isSubjectLeader)
+                                {
+                                    <button type="button" class="btn btn-sm btn-action-delete rounded-3 fs-8 px-2.5 py-1 d-flex align-items-center gap-1"
+                                            onclick="confirmDeleteDocument(@doc.Id, '@JavaScriptEncoder.Default.Encode(doc.Title)')">
+                                        <i class="bi bi-trash"></i> Xóa
+                                    </button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
