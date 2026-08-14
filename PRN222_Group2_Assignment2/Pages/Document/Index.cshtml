@@ -1,0 +1,266 @@
+@page
+@model PRN222_Group2_Assignment2.Pages.Document.IndexModel
+@{
+    ViewData["Title"] = "Quản lý Tài liệu & Giảng dạy";
+    Layout = "_Layout";
+    var userRole = HttpContext.Session.GetString("UserRole");
+    var isSubjectLeader = userRole == "SubjectLeader";
+
+    var successMessage = TempData["SuccessMessage"]?.ToString();
+    var errorMessage = TempData["ErrorMessage"]?.ToString();
+}
+
+<div class="container-fluid px-4 py-3">
+    <!-- Top Action Banner & Alerts -->
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success fs-7 py-2.5 px-3 rounded-3 mb-3 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-check-circle-fill fs-6"></i>
+                <div>@successMessage</div>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger fs-7 py-2.5 px-3 rounded-3 mb-3 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill fs-6"></i>
+                <div>@errorMessage</div>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <!-- Header Title & Main Action Buttons -->
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+        <div>
+            <h4 class="fw-bold text-white mb-1 d-flex align-items-center gap-2">
+                <i class="bi bi-folder-symlink text-primary-accent"></i> Quản lý Tài liệu Giáo trình (Razor Pages)
+            </h4>
+            <p class="fs-7 text-slate-400 mb-0">Quản lý kho tài liệu, chương trình môn học và xem trích xuất các vector chunks RAG.</p>
+        </div>
+        @if (isSubjectLeader)
+        {
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-outline-secondary rounded-3 px-3 py-2 fs-7 fw-semibold d-flex align-items-center gap-2"
+                        data-bs-toggle="modal" data-bs-target="#manageSubjectModal">
+                    <i class="bi bi-journal-plus"></i> Thêm Môn học
+                </button>
+                <button type="button" class="btn btn-primary rounded-3 px-3.5 py-2 fs-7 fw-semibold d-flex align-items-center gap-2"
+                        data-bs-toggle="modal" data-bs-target="#uploadModal">
+                    <i class="bi bi-cloud-arrow-up-fill"></i> Tải lên Tài liệu
+                </button>
+            </div>
+        }
+    </div>
+
+    <!-- Subject Selection Pills Bar -->
+    <div class="glass-panel p-3 mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fs-8 text-uppercase tracking-wider text-slate-400 fw-bold">Danh mục Môn học</div>
+            <div class="fs-8 text-slate-500">Hiển thị tài liệu theo môn học</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-sm rounded-pill px-3 py-1.5 fs-7 d-flex align-items-center gap-1.5 @(Model.ViewModel.SelectedSubjectId == null ? "btn-subject-active" : "btn-subject-inactive")"
+                    onclick="filterSubject(null)">
+                <i class="bi bi-grid-fill"></i> Tất cả môn học
+                <span class="badge rounded-pill bg-slate-800 text-white ms-1 fs-8">@Model.ViewModel.Documents.Count</span>
+            </button>
+
+            @foreach (var sub in Model.ViewModel.Subjects)
+            {
+                var docCount = Model.ViewModel.Documents.Count(d => d.SubjectId == sub.Id);
+                var isActive = Model.ViewModel.SelectedSubjectId == sub.Id;
+
+                <button type="button" class="btn btn-sm rounded-pill px-3 py-1.5 fs-7 d-flex align-items-center gap-1.5 @(isActive ? "btn-subject-active" : "btn-subject-inactive")"
+                        onclick="filterSubject(@sub.Id)">
+                    <span>@sub.Code</span>
+                    <span class="badge rounded-pill bg-slate-800 text-white ms-1 fs-8">@docCount</span>
+                </button>
+            }
+        </div>
+    </div>
+
+    <!-- Filter & Search Controls Bar -->
+    <div class="glass-panel p-3 mb-4">
+        <div class="row g-3 align-items-center">
+            <div class="col-12 col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text bg-slate-900 border-slate-800 text-slate-400"><i class="bi bi-search"></i></span>
+                    <input type="text" id="searchInput" class="form-control bg-slate-900 border-slate-800 text-white fs-7"
+                           placeholder="Tìm kiếm theo tên tài liệu hoặc mã môn..." value="@Model.ViewModel.SearchQuery" onkeyup="debounceFilter()" />
+                </div>
+            </div>
+            <div class="col-12 col-md-3">
+                <select id="chapterSelect" class="form-select bg-slate-900 border-slate-800 text-white fs-7" onchange="applyFilters()">
+                    <option value="">-- Tất cả Chương / Phạm vi --</option>
+                    @foreach (var chap in Model.ViewModel.Chapters)
+                    {
+                        var isChapSelected = Model.ViewModel.SelectedChapterId == chap.Id;
+                        <option value="@chap.Id" selected="@isChapSelected">@chap.Title</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <select id="fileTypeSelect" class="form-select bg-slate-900 border-slate-800 text-white fs-7" onchange="applyFilters()">
+                    <option value="">-- Tất cả Định dạng tệp --</option>
+                    <option value=".pdf" selected="@(Model.ViewModel.FileTypeFilter == ".pdf")">PDF (.pdf)</option>
+                    <option value=".docx" selected="@(Model.ViewModel.FileTypeFilter == ".docx")">Microsoft Word (.docx)</option>
+                    <option value=".pptx" selected="@(Model.ViewModel.FileTypeFilter == ".pptx")">PowerPoint (.pptx)</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-2 text-md-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary w-100 py-2 fs-7" onclick="resetFilters()">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Đặt lại
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Table Container -->
+    <div class="glass-panel overflow-hidden" id="tableContainer">
+        @await Html.PartialAsync("_DocumentTable", Model.ViewModel)
+    </div>
+</div>
+
+<!-- Modals -->
+@await Html.PartialAsync("_UploadModal", Model.ViewModel)
+@await Html.PartialAsync("_ChunksModal")
+@await Html.PartialAsync("_ManageSubjectModal")
+
+<!-- Hidden Anti-Forgery Token Form for AJAX -->
+<form id="afForm" method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+</form>
+
+@section Scripts {
+    <script>
+        let selectedSubjectId = @(Model.ViewModel.SelectedSubjectId?.ToString() ?? "null");
+        let searchTimeout = null;
+
+        function filterSubject(subjectId) {
+            selectedSubjectId = subjectId;
+            applyFilters();
+        }
+
+        function debounceFilter() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(applyFilters, 300);
+        }
+
+        function resetFilters() {
+            selectedSubjectId = null;
+            document.getElementById('searchInput').value = '';
+            document.getElementById('chapterSelect').value = '';
+            document.getElementById('fileTypeSelect').value = '';
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const search = document.getElementById('searchInput').value;
+            const chapterId = document.getElementById('chapterSelect').value;
+            const fileType = document.getElementById('fileTypeSelect').value;
+
+            const url = `?handler=DocumentsPartial&selectedSubjectId=${selectedSubjectId || ''}&selectedChapterId=${chapterId || ''}&search=${encodeURIComponent(search)}&fileType=${encodeURIComponent(fileType)}`;
+
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('tableContainer').innerHTML = html;
+                })
+                .catch(err => console.error('Error fetching partial:', err));
+        }
+
+        function loadChaptersForUpload(subjectId) {
+            const select = document.getElementById('uploadChapterSelect');
+            select.innerHTML = '<option value="">-- Tất cả chương (Toàn bộ tài liệu) --</option>';
+
+            if (!subjectId) return;
+
+            fetch(`?handler=Chapters&subjectId=${subjectId}`)
+                .then(res => res.json())
+                .then(chapters => {
+                    chapters.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = `Chương ${c.chapterNumber}: ${c.title}`;
+                        select.appendChild(opt);
+                    });
+                });
+        }
+
+        function handleFileSelected(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                document.getElementById('dropzoneContent').classList.add('d-none');
+                document.getElementById('selectedFileInfo').classList.remove('d-none');
+                document.getElementById('fileNameDisplay').textContent = file.name;
+                document.getElementById('fileSizeDisplay').textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+            }
+        }
+
+        function openChunksModal(docId, docTitle) {
+            document.getElementById('chunksDocTitle').textContent = docTitle;
+            document.getElementById('chunksModalLoading').classList.remove('d-none');
+            document.getElementById('chunksModalList').classList.add('d-none');
+            document.getElementById('chunksModalList').innerHTML = '';
+
+            const modal = new bootstrap.Modal(document.getElementById('chunksModal'));
+            modal.show();
+
+            fetch(`?handler=Chunks&id=${docId}`)
+                .then(res => res.json())
+                .then(chunks => {
+                    document.getElementById('chunksModalLoading').classList.add('d-none');
+                    document.getElementById('chunksModalList').classList.remove('d-none');
+                    document.getElementById('chunksSummaryText').textContent = `Tổng số chunks: ${chunks.length}`;
+
+                    const container = document.getElementById('chunksModalList');
+                    if (chunks.length === 0) {
+                        container.innerHTML = '<div class="text-center py-4 text-slate-400">Không có chunk văn bản nào.</div>';
+                        return;
+                    }
+
+                    chunks.forEach((chunk, index) => {
+                        const card = document.createElement('div');
+                        card.className = 'chunk-card';
+                        card.innerHTML = `
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="badge rounded-pill bg-slate-800 text-primary-accent border border-slate-700 fs-8 font-monospace px-2.5 py-1">
+                                    Chunk #${index + 1}
+                                </span>
+                                <span class="fs-8 text-slate-400 font-monospace">Token ước tính: ~${chunk.tokenEstimate || Math.ceil(chunk.chunkText.length / 4)} tokens</span>
+                            </div>
+                            <div class="chunk-content">${escapeHtml(chunk.chunkText)}</div>
+                        `;
+                        container.appendChild(card);
+                    });
+                });
+        }
+
+        function confirmDeleteDocument(docId, docTitle) {
+            if (confirm(`Bạn có chắc chắn muốn xóa tài liệu "${docTitle}" và toàn bộ chunks liên quan?`)) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `?handler=Delete&id=${docId}`;
+
+                const afToken = document.querySelector('#afForm input[name="__RequestVerificationToken"]').value;
+                const tokenInput = document.createElement('input');
+                tokenInput.type = 'hidden';
+                tokenInput.name = '__RequestVerificationToken';
+                tokenInput.value = afToken;
+                form.appendChild(tokenInput);
+
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+}
