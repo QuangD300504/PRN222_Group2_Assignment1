@@ -1,22 +1,406 @@
-html {
-  font-size: 14px;
-}
+:root {
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
 
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
+    /* Neutral Graphite Dark Palette (Zero Purple) */
+    --bg-body: #10121a;            /* Neutral graphite canvas */
+    --bg-card: #171a26;            /* Solid charcoal card */
+    --bg-subtle: #1e2233;          /* Dark slate surface */
+    --bg-hover: #262b40;
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
+    --border-subtle: #252a3d;      /* Crisp dark border */
+    --border-strong: #333a54;
 
-html {
-  position: relative;
-  min-height: 100%;
+    --text-primary: #f8fafc;        /* Crisp solid white */
+    --text-secondary: #cbd5e1;      /* High-contrast slate */
+    --text-muted: #94a3b8;          /* Muted labels */
+
+    /* Signal Blue Accent */
+    --signal-blue: #0057ff;
+    --signal-blue-hover: #0046cd;
+    --signal-blue-subtle: rgba(0, 87, 255, 0.15);
+    --signal-blue-border: rgba(0, 87, 255, 0.3);
+
+    --accent-emerald: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
 }
 
 body {
-  margin-bottom: 60px;
+    font-family: var(--font-sans);
+    background-color: var(--bg-body);
+    color: var(--text-secondary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Helper Utilities */
+.bg-slate-950, .bg-slate-900 { background-color: var(--bg-card) !important; }
+.bg-slate-850, .bg-slate-800 { background-color: var(--bg-subtle) !important; }
+.bg-slate-700 { background-color: var(--border-subtle) !important; }
+
+.border-slate-800, .border-slate-700 { border-color: var(--border-subtle) !important; }
+
+.text-white { color: #ffffff !important; }
+.text-slate-900, .text-slate-800 { color: var(--text-primary) !important; }
+.text-slate-100, .text-slate-200, .text-slate-300 { color: var(--text-primary) !important; }
+.text-slate-400 { color: var(--text-secondary) !important; }
+.text-slate-500 { color: var(--text-muted) !important; }
+.text-primary-accent { color: var(--signal-blue) !important; }
+
+/* Navbar */
+.navbar-custom {
+    background-color: var(--bg-card) !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+.brand-icon-box {
+    width: 34px;
+    height: 34px;
+    background-color: var(--signal-blue) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(0, 87, 255, 0.3);
+}
+
+.btn-primary, .btn-primary i,
+.btn-iris, .btn-iris i,
+.btn-subject-active, .btn-subject-active i,
+.nav-link.active, .nav-link.active i {
+    color: #ffffff !important;
+}
+
+.avatar-sm {
+    width: 26px;
+    height: 26px;
+    font-size: 12px;
+    color: #ffffff !important;
+}
+
+/* User Profile Button & Dropdown */
+.user-profile-btn {
+    background-color: #1e2233 !important;
+    border: 1px solid #2d344d !important;
+    color: #ffffff !important;
+}
+
+.user-profile-btn:hover, .user-profile-btn:focus {
+    background-color: #262b40 !important;
+    color: #ffffff !important;
+    border-color: var(--signal-blue) !important;
+}
+
+.user-profile-btn .user-name {
+    color: #ffffff !important;
+}
+
+.user-dropdown-menu {
+    background-color: #171a26 !important;
+    border: 1px solid #2d344d !important;
+    color: #f8fafc !important;
+    border-radius: 0.75rem !important;
+}
+
+.user-dropdown-menu .user-email {
+    color: #94a3b8 !important;
+}
+
+.user-dropdown-menu .dropdown-item {
+    color: #f8fafc !important;
+}
+
+.user-dropdown-menu .dropdown-item:hover {
+    background-color: #222638 !important;
+    color: #ffffff !important;
+}
+
+.user-dropdown-menu .dropdown-item.text-danger {
+    color: #fb7185 !important;
+}
+
+.fs-7 { font-size: 0.85rem; }
+.fs-8 { font-size: 0.75rem; }
+
+/* Main CTA Button — Signal Blue Solid Fill */
+.btn-primary {
+    background-color: var(--signal-blue) !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 8px rgba(0, 87, 255, 0.3);
+    transition: all 0.15s ease !important;
+}
+
+.btn-primary:hover, .btn-primary:focus {
+    background-color: var(--signal-blue-hover) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(0, 87, 255, 0.45);
+    transform: translateY(-1px);
+}
+
+.btn-iris {
+    background-color: var(--signal-blue) !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 500 !important;
+}
+
+.btn-iris:hover {
+    background-color: var(--signal-blue-hover) !important;
+    color: #ffffff !important;
+}
+
+/* Subject Tabs — Active Signal Blue / Inactive Dark Graphite */
+.btn-subject-active {
+    background-color: var(--signal-blue) !important;
+    color: #ffffff !important;
+    border: 1px solid var(--signal-blue) !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 8px rgba(0, 87, 255, 0.3);
+}
+
+.btn-subject-inactive {
+    background-color: var(--bg-subtle) !important;
+    color: var(--text-secondary) !important;
+    border: 1px solid var(--border-subtle) !important;
+}
+
+.btn-subject-inactive:hover {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--signal-blue) !important;
+}
+
+/* Action Buttons (Table Row) */
+.btn-action-chunks {
+    background-color: var(--signal-blue-subtle) !important;
+    color: #80b3ff !important;
+    border: 1px solid var(--signal-blue-border) !important;
+    font-weight: 500 !important;
+    transition: all 0.15s ease !important;
+}
+
+.btn-action-chunks:hover {
+    background-color: var(--signal-blue) !important;
+    color: #ffffff !important;
+    border-color: var(--signal-blue) !important;
+}
+
+.btn-action-delete {
+    background-color: rgba(244, 63, 94, 0.12) !important;
+    color: #fb7185 !important;
+    border: 1px solid rgba(244, 63, 94, 0.25) !important;
+    font-weight: 500 !important;
+    transition: all 0.15s ease !important;
+}
+
+.btn-action-delete:hover {
+    background-color: var(--accent-rose) !important;
+    color: #ffffff !important;
+    border-color: var(--accent-rose) !important;
+}
+
+/* Stat Cards */
+.stat-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.85rem;
+    padding: 1.25rem;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.stat-card:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-2px);
+}
+
+.stat-icon-wrapper {
+    width: 44px;
+    height: 44px;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    background: var(--signal-blue-subtle) !important;
+    color: #80b3ff !important;
+}
+
+/* Glass & Card Panels */
+.glass-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.85rem;
+}
+
+/* Form Inputs & Selects */
+.form-select, .form-control, .input-group-text {
+    background-color: var(--bg-body) !important;
+    border-color: var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+}
+
+.form-select:focus, .form-control:focus {
+    border-color: var(--signal-blue) !important;
+    box-shadow: 0 0 0 3px rgba(0, 87, 255, 0.2) !important;
+}
+
+/* Custom Tabs */
+.nav-pills-custom .nav-link {
+    color: var(--text-secondary);
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.nav-pills-custom .nav-link:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-subtle);
+}
+
+.nav-pills-custom .nav-link.active {
+    background-color: var(--signal-blue);
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 87, 255, 0.3);
+}
+
+/* File Badge Types */
+.file-type-badge {
+    width: 38px;
+    height: 38px;
+    border-radius: 0.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
+.file-type-pdf {
+    background-color: rgba(244, 63, 94, 0.12);
+    color: #fb7185;
+    border: 1px solid rgba(244, 63, 94, 0.25);
+}
+
+.file-type-docx {
+    background-color: var(--signal-blue-subtle);
+    color: #80b3ff;
+    border: 1px solid var(--signal-blue-border);
+}
+
+.file-type-pptx {
+    background-color: rgba(245, 158, 11, 0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* Chapter Pill */
+.chapter-pill {
+    background-color: var(--bg-subtle);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Status Badges */
+.status-pill {
+    padding: 0.25rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.status-pill-ready {
+    background-color: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.status-pill-processing {
+    background-color: rgba(245, 158, 11, 0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.status-pill-failed {
+    background-color: rgba(244, 63, 94, 0.12);
+    color: #fb7185;
+    border: 1px solid rgba(244, 63, 94, 0.25);
+}
+
+/* Table Hover Effect */
+.table-custom {
+    color: var(--text-primary);
+}
+
+.table-custom thead {
+    background-color: var(--bg-subtle) !important;
+}
+
+.table-custom tr {
+    border-color: var(--border-subtle);
+    transition: background-color 0.15s ease;
+}
+
+.table-custom tbody tr:hover {
+    background-color: var(--bg-subtle) !important;
+}
+
+/* Modals */
+.modal-content-dark {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 1rem;
+    color: var(--text-primary);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content-dark .modal-header {
+    background-color: var(--bg-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.modal-content-dark .modal-footer {
+    border-top: 1px solid var(--border-subtle);
+}
+
+/* Chunk Box */
+.chunk-card {
+    background-color: var(--bg-subtle);
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 0.85rem;
+}
+
+.chunk-content {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+}
+
+/* Dropzone Upload */
+.upload-dropzone {
+    border: 2px dashed var(--border-strong);
+    border-radius: 1rem;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    background-color: var(--bg-body);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.upload-dropzone:hover {
+    border-color: var(--signal-blue);
+    background-color: var(--signal-blue-subtle);
 }

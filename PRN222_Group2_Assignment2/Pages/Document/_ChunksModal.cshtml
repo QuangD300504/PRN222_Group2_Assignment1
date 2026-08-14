@@ -1,0 +1,28 @@
+<div class="modal fade" id="chunksModal" tabindex="-1" aria-labelledby="chunksModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content modal-content-dark">
+            <div class="modal-header py-3 px-4">
+                <div>
+                    <h5 class="modal-title fs-6 fw-bold text-white d-flex align-items-center gap-2" id="chunksModalLabel">
+                        <i class="bi bi-cpu text-primary-accent"></i> Chi tiết Chunks RAG Vector
+                    </h5>
+                    <div class="fs-8 text-slate-400 mt-0.5" id="chunksDocTitle">Đang tải...</div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-slate-950">
+                <div id="chunksModalLoading" class="text-center py-5">
+                    <div class="spinner-border text-primary-accent" role="status"></div>
+                    <div class="fs-8 text-slate-400 mt-2">Đang tải danh sách chunks văn bản...</div>
+                </div>
+                <div id="chunksModalList" class="d-none">
+                    <!-- Dynamic Chunks Box List -->
+                </div>
+            </div>
+            <div class="modal-footer py-2.5 px-4 bg-slate-900 justify-content-between">
+                <div class="fs-8 text-slate-400" id="chunksSummaryText">Tổng số chunks: 0</div>
+                <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 px-3 fs-7" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
