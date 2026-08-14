@@ -5,7 +5,11 @@ using PRN222_Group2_Assignment1.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddRazorPages();
+builder.Services.AddRazorPages(options =>
+{
+    // Map root URL "/" directly to "/Auth/Login" page
+    options.Conventions.AddPageRoute("/Auth/Login", "");
+});
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));

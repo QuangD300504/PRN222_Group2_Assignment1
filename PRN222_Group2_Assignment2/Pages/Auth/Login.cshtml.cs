@@ -44,14 +44,16 @@ namespace PRN222_Group2_Assignment2.Pages.Auth
             var user = await _authService.LoginAsync(Input.Email, Input.Password);
             if (user == null)
             {
-                ErrorMessage = "Email hoặc mật khẩu không chính xác.";
+                ErrorMessage = "Invalid email or password.";
                 return Page();
             }
 
-            // Set Session credentials
-            HttpContext.Session.SetString("UserId", user.Id.ToString());
+            // Set Session credentials exactly matching Assignment 1
             HttpContext.Session.SetString("UserEmail", user.Email);
+            HttpContext.Session.SetString("UserName", user.FullName);
             HttpContext.Session.SetString("UserRole", user.Role);
+            HttpContext.Session.SetInt32("UserId", user.Id);
+            HttpContext.Session.SetString("UserId", user.Id.ToString());
 
             if (!string.IsNullOrEmpty(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
             {
