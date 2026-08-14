@@ -4,7 +4,8 @@
 @{
     ViewData["Title"] = "Quản lý Tài liệu & Indexing";
     var activeSubject = Model.ViewModel.Subjects.FirstOrDefault(s => s.Id == Model.ViewModel.SelectedSubjectId);
-    var isSubjectLeader = HttpContext.Session.GetString("UserRole") == "SubjectLeader";
+    var userRole = ViewContext.HttpContext.Session.GetString("UserRole") ?? "";
+    var isSubjectLeader = string.Equals(userRole.Trim(), "SubjectLeader", StringComparison.OrdinalIgnoreCase);
 }
 
 @Html.AntiForgeryToken()

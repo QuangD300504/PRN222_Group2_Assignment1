@@ -18,6 +18,12 @@ namespace PRN222_Group2_Assignment2.Pages.Document
 
         public DocumentManagementViewModel ViewModel { get; set; } = new DocumentManagementViewModel();
 
+        private bool IsSubjectLeader()
+        {
+            var role = HttpContext.Session.GetString("UserRole") ?? "";
+            return string.Equals(role.Trim(), "SubjectLeader", StringComparison.OrdinalIgnoreCase);
+        }
+
         public async Task<IActionResult> OnGetAsync(int? selectedSubjectId, int? selectedChapterId, string? search, string? fileType)
         {
             var userEmail = HttpContext.Session.GetString("UserEmail");
@@ -54,8 +60,7 @@ namespace PRN222_Group2_Assignment2.Pages.Document
 
         public async Task<IActionResult> OnPostUploadAsync([FromForm] UploadDocumentViewModel input)
         {
-            var userRole = HttpContext.Session.GetString("UserRole");
-            if (userRole != "SubjectLeader")
+            if (!IsSubjectLeader())
             {
                 return new JsonResult(new { success = false, message = "Chỉ có Subject Leader mới có quyền tải lên tài liệu." });
             }
@@ -78,8 +83,7 @@ namespace PRN222_Group2_Assignment2.Pages.Document
 
         public async Task<IActionResult> OnPostDeleteAsync(int id, int? subjectId)
         {
-            var userRole = HttpContext.Session.GetString("UserRole");
-            if (userRole != "SubjectLeader")
+            if (!IsSubjectLeader())
             {
                 TempData["ErrorMessage"] = "Chỉ có Subject Leader mới có quyền xóa tài liệu.";
                 return RedirectToPage(new { selectedSubjectId = subjectId });
@@ -100,8 +104,7 @@ namespace PRN222_Group2_Assignment2.Pages.Document
 
         public async Task<IActionResult> OnPostUpdateSubjectAsync(int subjectId, string code, string name, string? description)
         {
-            var userRole = HttpContext.Session.GetString("UserRole");
-            if (userRole != "SubjectLeader")
+            if (!IsSubjectLeader())
                 return new JsonResult(new { success = false, message = "Only Subject Leaders can edit subject details." });
 
             if (string.IsNullOrWhiteSpace(code))
@@ -116,8 +119,7 @@ namespace PRN222_Group2_Assignment2.Pages.Document
 
         public async Task<IActionResult> OnPostCreateSubjectAsync(string code, string name, string? description)
         {
-            var userRole = HttpContext.Session.GetString("UserRole");
-            if (userRole != "SubjectLeader")
+            if (!IsSubjectLeader())
             {
                 return new JsonResult(new { success = false, message = "Chỉ có Subject Leader mới có quyền thêm môn học." });
             }
@@ -139,8 +141,7 @@ namespace PRN222_Group2_Assignment2.Pages.Document
 
         public async Task<IActionResult> OnPostDeleteSubjectAsync(int id)
         {
-            var userRole = HttpContext.Session.GetString("UserRole");
-            if (userRole != "SubjectLeader")
+            if (!IsSubjectLeader())
             {
                 return new JsonResult(new { success = false, message = "Chỉ có Subject Leader mới có quyền xóa môn học." });
             }
@@ -151,8 +152,7 @@ namespace PRN222_Group2_Assignment2.Pages.Document
 
         public async Task<IActionResult> OnPostSaveChapterAsync(int subjectId, int? id, int chapterNumber, string title, string? summary)
         {
-            var userRole = HttpContext.Session.GetString("UserRole");
-            if (userRole != "SubjectLeader")
+            if (!IsSubjectLeader())
                 return new JsonResult(new { success = false, message = "Only Subject Leaders can manage chapters." });
 
             if (chapterNumber <= 0 || string.IsNullOrWhiteSpace(title))
@@ -164,8 +164,7 @@ namespace PRN222_Group2_Assignment2.Pages.Document
 
         public async Task<IActionResult> OnPostDeleteChapterAsync(int id)
         {
-            var userRole = HttpContext.Session.GetString("UserRole");
-            if (userRole != "SubjectLeader")
+            if (!IsSubjectLeader())
                 return new JsonResult(new { success = false, message = "Only Subject Leaders can delete chapters." });
 
             var (success, message) = await _documentService.DeleteChapterAsync(id);

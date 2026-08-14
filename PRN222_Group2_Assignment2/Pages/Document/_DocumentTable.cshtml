@@ -2,7 +2,8 @@
 
 @{
     var activeSubject = Model.Subjects.FirstOrDefault(s => s.Id == Model.SelectedSubjectId);
-    var isSubjectLeader = ViewContext.HttpContext.Session.GetString("UserRole") == "SubjectLeader";
+    var userRole = ViewContext.HttpContext.Session.GetString("UserRole") ?? "";
+    var isSubjectLeader = string.Equals(userRole.Trim(), "SubjectLeader", StringComparison.OrdinalIgnoreCase);
 }
 
 <div id="doc-table-region">
