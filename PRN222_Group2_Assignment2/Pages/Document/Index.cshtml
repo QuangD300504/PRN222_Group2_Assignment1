@@ -164,7 +164,7 @@
             const chapterId = document.getElementById('chapterSelect').value;
             const fileType = document.getElementById('fileTypeSelect').value;
 
-            const url = `?handler=DocumentsPartial&selectedSubjectId=${selectedSubjectId || ''}&selectedChapterId=${chapterId || ''}&search=${encodeURIComponent(search)}&fileType=${encodeURIComponent(fileType)}`;
+            const url = `?handler=DocumentsPartial&subjectId=${selectedSubjectId || ''}&chapterId=${chapterId || ''}&search=${encodeURIComponent(search)}&fileType=${encodeURIComponent(fileType)}`;
 
             fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
                 .then(res => res.text())
@@ -213,7 +213,8 @@
 
             fetch(`?handler=Chunks&id=${docId}`)
                 .then(res => res.json())
-                .then(chunks => {
+                .then(data => {
+                    const chunks = Array.isArray(data) ? data : (data.chunks || []);
                     document.getElementById('chunksModalLoading').classList.add('d-none');
                     document.getElementById('chunksModalList').classList.remove('d-none');
                     document.getElementById('chunksSummaryText').textContent = `Tổng số chunks: ${chunks.length}`;
@@ -230,11 +231,11 @@
                         card.innerHTML = `
                             <div class="d-flex align-items-center justify-content-between mb-2">
                                 <span class="badge rounded-pill bg-slate-800 text-primary-accent border border-slate-700 fs-8 font-monospace px-2.5 py-1">
-                                    Chunk #${index + 1}
+                                    Chunk #${chunk.chunkIndex || (index + 1)}
                                 </span>
-                                <span class="fs-8 text-slate-400 font-monospace">Token ước tính: ~${chunk.tokenEstimate || Math.ceil(chunk.chunkText.length / 4)} tokens</span>
+                                <span class="fs-8 text-slate-400 font-monospace">Token ước tính: ~${chunk.tokenCount || Math.ceil((chunk.content || chunk.chunkText || '').length / 4)} tokens</span>
                             </div>
-                            <div class="chunk-content">${escapeHtml(chunk.chunkText)}</div>
+                            <div class="chunk-content">${escapeHtml(chunk.content || chunk.chunkText || '')}</div>
                         `;
                         container.appendChild(card);
                     });
