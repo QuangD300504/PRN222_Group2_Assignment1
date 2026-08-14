@@ -1,267 +1,579 @@
 @page
 @model PRN222_Group2_Assignment2.Pages.Document.IndexModel
-@{
-    ViewData["Title"] = "Quản lý Tài liệu & Giảng dạy";
-    Layout = "_Layout";
-    var userRole = HttpContext.Session.GetString("UserRole");
-    var isSubjectLeader = userRole == "SubjectLeader";
 
-    var successMessage = TempData["SuccessMessage"]?.ToString();
-    var errorMessage = TempData["ErrorMessage"]?.ToString();
+@{
+    ViewData["Title"] = "Quản lý Tài liệu & Indexing";
+    var activeSubject = Model.ViewModel.Subjects.FirstOrDefault(s => s.Id == Model.ViewModel.SelectedSubjectId);
+    var isSubjectLeader = HttpContext.Session.GetString("UserRole") == "SubjectLeader";
 }
 
-<div class="container-fluid px-4 py-3">
-    <!-- Top Action Banner & Alerts -->
-    @if (!string.IsNullOrEmpty(successMessage))
-    {
-        <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success fs-7 py-2.5 px-3 rounded-3 mb-3 d-flex align-items-center justify-content-between">
-            <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-check-circle-fill fs-6"></i>
-                <div>@successMessage</div>
-            </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    }
+@Html.AntiForgeryToken()
 
-    @if (!string.IsNullOrEmpty(errorMessage))
-    {
-        <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger fs-7 py-2.5 px-3 rounded-3 mb-3 d-flex align-items-center justify-content-between">
-            <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-exclamation-triangle-fill fs-6"></i>
-                <div>@errorMessage</div>
-            </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    }
-
-    <!-- Header Title & Main Action Buttons -->
+<div class="container-fluid px-4 py-4">
+    <!-- Header Section -->
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
         <div>
-            <h4 class="fw-bold text-white mb-1 d-flex align-items-center gap-2">
-                <i class="bi bi-folder-symlink text-primary-accent"></i> Quản lý Tài liệu Giáo trình (Razor Pages)
-            </h4>
-            <p class="fs-7 text-slate-400 mb-0">Quản lý kho tài liệu, chương trình môn học và xem trích xuất các vector chunks RAG.</p>
+            <h2 class="fw-bold text-white mb-0">Quản lý Tài liệu &amp; Embedded Chunks</h2>
         </div>
-        @if (isSubjectLeader)
-        {
-            <div class="d-flex align-items-center gap-2">
-                <button type="button" class="btn btn-outline-secondary rounded-3 px-3 py-2 fs-7 fw-semibold d-flex align-items-center gap-2"
-                        data-bs-toggle="modal" data-bs-target="#manageSubjectModal">
-                    <i class="bi bi-journal-plus"></i> Thêm Môn học
-                </button>
-                <button type="button" class="btn btn-primary rounded-3 px-3.5 py-2 fs-7 fw-semibold d-flex align-items-center gap-2"
-                        data-bs-toggle="modal" data-bs-target="#uploadModal">
-                    <i class="bi bi-cloud-arrow-up-fill"></i> Tải lên Tài liệu
-                </button>
-            </div>
-        }
-    </div>
 
-    <!-- Subject Selection Pills Bar -->
-    <div class="glass-panel p-3 mb-4">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="fs-8 text-uppercase tracking-wider text-slate-400 fw-bold">Danh mục Môn học</div>
-            <div class="fs-8 text-slate-500">Hiển thị tài liệu theo môn học</div>
-        </div>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-            <button type="button" class="btn btn-sm rounded-pill px-3 py-1.5 fs-7 d-flex align-items-center gap-1.5 @(Model.ViewModel.SelectedSubjectId == null ? "btn-subject-active" : "btn-subject-inactive")"
-                    onclick="filterSubject(null)">
-                <i class="bi bi-grid-fill"></i> Tất cả môn học
-                <span class="badge rounded-pill bg-slate-800 text-white ms-1 fs-8">@Model.ViewModel.Documents.Count</span>
-            </button>
-
-            @foreach (var sub in Model.ViewModel.Subjects)
+        <div class="d-flex align-items-center gap-2">
+            @if (isSubjectLeader)
             {
-                var docCount = Model.ViewModel.Documents.Count(d => d.SubjectId == sub.Id);
-                var isActive = Model.ViewModel.SelectedSubjectId == sub.Id;
+                <button type="button" class="btn btn-slate-800 text-slate-300 border-slate-700 rounded-3 px-3 py-2 fw-semibold d-flex align-items-center gap-2" onclick="openManageSubjectModal()">
+                    <i class="bi bi-gear-fill text-primary-accent fs-5"></i>
+                    <span>Quản lý Môn &amp; Chương</span>
+                </button>
 
-                <button type="button" class="btn btn-sm rounded-pill px-3 py-1.5 fs-7 d-flex align-items-center gap-1.5 @(isActive ? "btn-subject-active" : "btn-subject-inactive")"
-                        onclick="filterSubject(@sub.Id)">
-                    <span>@sub.Code</span>
-                    <span class="badge rounded-pill bg-slate-800 text-white ms-1 fs-8">@docCount</span>
+                <button type="button" class="btn btn-primary bg-gradient-primary border-0 rounded-3 px-4 py-2 fw-semibold d-flex align-items-center gap-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                    <i class="bi bi-cloud-arrow-up-fill fs-5"></i>
+                    <span>Tải lên tài liệu mới</span>
                 </button>
             }
         </div>
     </div>
 
-    <!-- Filter & Search Controls Bar -->
-    <div class="glass-panel p-3 mb-4">
-        <div class="row g-3 align-items-center">
-            <div class="col-12 col-md-4">
-                <div class="input-group">
-                    <span class="input-group-text bg-slate-900 border-slate-800 text-slate-400"><i class="bi bi-search"></i></span>
-                    <input type="text" id="searchInput" class="form-control bg-slate-900 border-slate-800 text-white fs-7"
-                           placeholder="Tìm kiếm theo tên tài liệu hoặc mã môn..." value="@Model.ViewModel.SearchQuery" onkeyup="debounceFilter()" />
-                </div>
+    <!-- Subject Selection Pills & Create Subject Bar -->
+    <div class="d-flex flex-column gap-2 mb-4 bg-slate-850 p-3 rounded-3 border border-slate-800">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="text-slate-400 fs-7 fw-medium me-2"><i class="bi bi-book-half text-primary-accent"></i> Môn học:</span>
+                @foreach (var sub in Model.ViewModel.Subjects)
+                {
+                    var isSelected = Model.ViewModel.SelectedSubjectId == sub.Id;
+                    var docCount = sub.Documents?.Count ?? 0;
+                    <button type="button"
+                            class="btn btn-sm rounded-pill px-3 py-1-5 fw-semibold transition-all @(isSelected ? "btn-primary bg-gradient-primary border-0 text-white shadow-sm" : "btn-slate-800 text-slate-300 border-slate-700 hover-slate-700")"
+                            data-subject-id="@sub.Id"
+                            onclick="switchSubject(@sub.Id)">
+                        <span>@sub.Code</span>
+                        <span class="doc-count opacity-75 ms-1 fs-8" id="subject-count-@sub.Id" data-count="@docCount">(@docCount)</span>
+                    </button>
+                }
             </div>
-            <div class="col-12 col-md-3">
-                <select id="chapterSelect" class="form-select bg-slate-900 border-slate-800 text-white fs-7" onchange="applyFilters()">
-                    <option value="">-- Tất cả Chương / Phạm vi --</option>
-                    @foreach (var chap in Model.ViewModel.Chapters)
-                    {
-                        var isChapSelected = Model.ViewModel.SelectedChapterId == chap.Id;
-                        <option value="@chap.Id" selected="@isChapSelected">@chap.Title</option>
-                    }
-                </select>
-            </div>
-            <div class="col-12 col-md-3">
-                <select id="fileTypeSelect" class="form-select bg-slate-900 border-slate-800 text-white fs-7" onchange="applyFilters()">
-                    <option value="">-- Tất cả Định dạng tệp --</option>
-                    <option value=".pdf" selected="@(Model.ViewModel.FileTypeFilter == ".pdf")">PDF (.pdf)</option>
-                    <option value=".docx" selected="@(Model.ViewModel.FileTypeFilter == ".docx")">Microsoft Word (.docx)</option>
-                    <option value=".pptx" selected="@(Model.ViewModel.FileTypeFilter == ".pptx")">PowerPoint (.pptx)</option>
-                </select>
-            </div>
-            <div class="col-12 col-md-2 text-md-end">
-                <button type="button" class="btn btn-sm btn-outline-secondary w-100 py-2 fs-7" onclick="resetFilters()">
-                    <i class="bi bi-arrow-counterclockwise me-1"></i> Đặt lại
+
+            @if (isSubjectLeader)
+            {
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1-5 fw-semibold d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#createSubjectModal">
+                    <i class="bi bi-plus-lg"></i>
+                    <span>Thêm môn học mới</span>
                 </button>
+            }
+        </div>
+
+        @{ var initDesc = activeSubject?.Description; }
+        @{
+            var hasInfo = activeSubject != null && (!string.IsNullOrWhiteSpace(activeSubject.Name) || !string.IsNullOrWhiteSpace(initDesc));
+        }
+        <div id="subjectDescCallout" class="@(hasInfo ? "" : "d-none ")d-flex align-items-start gap-2 border-top border-slate-800 pt-2 mt-1">
+            <i class="bi bi-info-circle text-primary-accent flex-shrink-0" style="margin-top:2px"></i>
+            <div>
+                <div class="fw-semibold text-slate-200 fs-7">
+                    <span class="badge bg-slate-800 text-primary-accent border border-slate-700 me-1 fs-8" id="subjectCodeBadge">@activeSubject?.Code</span>
+                    <span id="subjectNameText">@activeSubject?.Name</span>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(initDesc))
+                {
+                    <div class="text-slate-400 fs-8 mt-0-5" id="subjectDescText">@initDesc</div>
+                }
+                @if (string.IsNullOrWhiteSpace(initDesc))
+                {
+                    <div class="text-slate-400 fs-8 mt-0-5 d-none" id="subjectDescText"></div>
+                }
             </div>
         </div>
     </div>
 
-    <!-- Document Table Container -->
-    <div class="glass-panel overflow-hidden" id="tableContainer">
+    <!-- Partial region -->
+    <div id="doc-partial-region">
         @await Html.PartialAsync("_DocumentTable", Model.ViewModel)
     </div>
 </div>
 
-<!-- Modals -->
-@await Html.PartialAsync("_UploadModal", Model.ViewModel)
 @await Html.PartialAsync("_ChunksModal")
-@await Html.PartialAsync("_ManageSubjectModal")
+@await Html.PartialAsync("_UploadModal", Model.ViewModel)
+<div id="manageSubjectModalRegion">
+    @await Html.PartialAsync("_ManageSubjectModal", Model.ViewModel)
+</div>
 
-<!-- Hidden Anti-Forgery Token Form for AJAX -->
-<form id="afForm" method="post" style="display:none;">
-    @Html.AntiForgeryToken()
-</form>
+<!-- Create Subject Modal -->
+<div class="modal fade" id="createSubjectModal" tabindex="-1" aria-labelledby="createSubjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-content-dark">
+            <div class="modal-header border-bottom border-slate-800 px-4 py-3">
+                <h5 class="modal-title fw-bold text-white fs-6 d-flex align-items-center gap-2" id="createSubjectModalLabel">
+                    <i class="bi bi-journal-plus text-primary-accent"></i>
+                    <span>Tạo Môn Học Mới</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="createSubjectAlert" class="alert alert-danger d-none rounded-3 fs-7 py-2 px-3"></div>
+                <div class="mb-3">
+                    <label class="form-label text-slate-300 fs-7 fw-medium">Mã Môn Học <span class="text-danger">*</span></label>
+                    <input type="text" id="newSubjectCode" class="form-control form-control-dark" placeholder="Ví dụ: PRN222" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-slate-300 fs-7 fw-medium">Tên Môn Học <span class="text-danger">*</span></label>
+                    <input type="text" id="newSubjectName" class="form-control form-control-dark" placeholder="Ví dụ: C# &amp; .NET Application Development" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-slate-300 fs-7 fw-medium">Mô tả Môn Học</label>
+                    <textarea id="newSubjectDesc" class="form-control form-control-dark" rows="3" placeholder="Nhập mô tả môn học..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-slate-800 px-4 py-3">
+                <button type="button" class="btn btn-slate-800 text-slate-300 border-slate-700 rounded-3 px-3 py-2 fs-7 fw-medium" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary bg-gradient-primary border-0 rounded-3 px-4 py-2 fs-7 fw-semibold" onclick="createSubjectSubmit()">Tạo Môn Học</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 @section Scripts {
     <script>
-        let selectedSubjectId = @(Model.ViewModel.SelectedSubjectId?.ToString() ?? "null");
-        let searchTimeout = null;
+        // Subject info map for client-side update on pill switch
+        const _subjectDescriptions = {
+            @foreach (var sub in Model.ViewModel.Subjects)
+            {
+                @: @sub.Id: { code: @Json.Serialize(sub.Code), name: @Json.Serialize(sub.Name ?? ""), desc: @Json.Serialize(sub.Description ?? "") },
+            }
+        };
 
-        function filterSubject(subjectId) {
-            selectedSubjectId = subjectId;
-            applyFilters();
-        }
+        let _activeSubjectId = @(Model.ViewModel.SelectedSubjectId ?? 0);
 
-        function debounceFilter() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(applyFilters, 300);
-        }
+        function switchSubject(subjectId) {
+            if (subjectId === _activeSubjectId) return;
+            _activeSubjectId = subjectId;
 
-        function resetFilters() {
-            selectedSubjectId = null;
-            document.getElementById('searchInput').value = '';
-            document.getElementById('chapterSelect').value = '';
-            document.getElementById('fileTypeSelect').value = '';
-            applyFilters();
-        }
+            // Update pill active state
+            document.querySelectorAll('[data-subject-id]').forEach(btn => {
+                const isActive = parseInt(btn.dataset.subjectId) === subjectId;
+                if (isActive) {
+                    btn.classList.remove('btn-subject-inactive');
+                    btn.classList.add('btn-subject-active');
+                } else {
+                    btn.classList.remove('btn-subject-active');
+                    btn.classList.add('btn-subject-inactive');
+                }
+            });
 
-        function applyFilters() {
-            const search = document.getElementById('searchInput').value;
-            const chapterId = document.getElementById('chapterSelect').value;
-            const fileType = document.getElementById('fileTypeSelect').value;
+            // Update subject info callout
+            const callout = document.getElementById('subjectDescCallout');
+            const info = _subjectDescriptions[subjectId];
+            if (info && (info.name || info.desc)) {
+                document.getElementById('subjectCodeBadge').textContent = info.code;
+                document.getElementById('subjectNameText').textContent = info.name;
+                const descEl = document.getElementById('subjectDescText');
+                if (info.desc) {
+                    descEl.textContent = info.desc;
+                    descEl.classList.remove('d-none');
+                } else {
+                    descEl.classList.add('d-none');
+                }
+                callout.classList.remove('d-none');
+            } else {
+                callout.classList.add('d-none');
+            }
 
-            const url = `?handler=DocumentsPartial&subjectId=${selectedSubjectId || ''}&chapterId=${chapterId || ''}&search=${encodeURIComponent(search)}&fileType=${encodeURIComponent(fileType)}`;
+            const region = document.getElementById('doc-partial-region');
+            region.style.opacity = '0.4';
 
-            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(res => res.text())
+            fetch(`?handler=DocumentsPartial&subjectId=${subjectId}`)
+                .then(r => r.text())
                 .then(html => {
-                    document.getElementById('tableContainer').innerHTML = html;
+                    region.innerHTML = html;
+                    region.style.opacity = '1';
                 })
-                .catch(err => console.error('Error fetching partial:', err));
+                .catch(() => { region.style.opacity = '1'; });
         }
 
-        function loadChaptersForUpload(subjectId) {
-            const select = document.getElementById('uploadChapterSelect');
-            select.innerHTML = '<option value="">-- Tất cả chương (Toàn bộ tài liệu) --</option>';
+        function viewDocumentChunks(docId) {
+            const modal = new bootstrap.Modal(document.getElementById('chunksModal'));
+            const modalBody = document.getElementById('chunksModalBody');
+            const modalSubtitle = document.getElementById('modalDocSubtitle');
 
-            if (!subjectId) return;
+            modalBody.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div class="text-slate-400 fs-8 mt-2">Đang tải thông tin chunks...</div>
+                </div>`;
+            modal.show();
 
-            fetch(`?handler=Chapters&subjectId=${subjectId}`)
-                .then(res => res.json())
-                .then(chapters => {
-                    chapters.forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c.id;
-                        opt.textContent = `Chương ${c.chapterNumber}: ${c.title}`;
-                        select.appendChild(opt);
+            fetch(`?handler=Chunks&id=${docId}`)
+                .then(res => {
+                    if (!res.ok) throw new Error('Document not found');
+                    return res.json();
+                })
+                .then(data => {
+                    modalSubtitle.innerHTML = `<span class="text-slate-200 fw-semibold">${data.title}</span> • ${data.subjectName} (${data.chapterTitle}) • ${data.chunkCount} Chunks`;
+
+                    if (!data.chunks || data.chunks.length === 0) {
+                        modalBody.innerHTML = `<div class="text-center py-4 text-slate-400">Chưa có chunk nào được trích xuất cho tài liệu này.</div>`;
+                        return;
+                    }
+
+                    let html = `<div class="mb-3 d-flex align-items-center justify-content-between bg-slate-850 p-3 rounded-3 border border-slate-800">
+                        <div>
+                            <span class="badge bg-primary-subtle text-primary-accent me-2">${data.fileExtension}</span>
+                            <span class="text-slate-300 fs-7">${data.fileName} (${data.formattedSize})</span>
+                        </div>
+                        <span class="status-pill status-pill-ready"><i class="bi bi-check-circle-fill"></i> ${data.status}</span>
+                    </div>`;
+
+                    data.chunks.forEach(c => {
+                        html += `
+                            <div class="chunk-card">
+                                <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom border-slate-800">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-slate-800 text-primary-accent border border-slate-700 fs-8">Chunk #${c.chunkIndex}</span>
+                                        <span class="text-slate-400 fs-8"><i class="bi bi-journal-page"></i> Trang ${c.pageNumber}</span>
+                                        ${c.heading ? `<span class="badge bg-slate-800 text-slate-300 fs-8">${c.heading}</span>` : ''}
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="text-slate-400 fs-8">${c.tokenCount} Tokens</span>
+                                        ${c.hasEmbedding ? `<span class="badge bg-emerald-500-subtle text-emerald-400 fs-8"><i class="bi bi-vector-pen"></i> Embedded</span>` : ''}
+                                    </div>
+                                </div>
+                                <div class="chunk-content">${escapeHtml(c.content)}</div>
+                            </div>
+                        `;
                     });
+
+                    modalBody.innerHTML = html;
+                })
+                .catch(err => {
+                    modalBody.innerHTML = `<div class="alert alert-danger">Có lỗi xảy ra khi tải dữ liệu chunk: ${err.message}</div>`;
                 });
         }
 
-        function handleFileSelected(input) {
+        function updateFilePreview(input) {
             if (input.files && input.files[0]) {
                 const file = input.files[0];
                 document.getElementById('dropzoneContent').classList.add('d-none');
                 document.getElementById('selectedFileInfo').classList.remove('d-none');
-                document.getElementById('fileNameDisplay').textContent = file.name;
-                document.getElementById('fileSizeDisplay').textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+                document.getElementById('selectedFileName').innerText = file.name;
+                document.getElementById('selectedFileSize').innerText = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+                if (!document.getElementById('docTitleInput').value)
+                    document.getElementById('docTitleInput').value = file.name.replace(/\.[^/.]+$/, '');
             }
         }
 
-        function openChunksModal(docId, docTitle) {
-            document.getElementById('chunksDocTitle').textContent = docTitle;
-            document.getElementById('chunksModalLoading').classList.remove('d-none');
-            document.getElementById('chunksModalList').classList.add('d-none');
-            document.getElementById('chunksModalList').innerHTML = '';
+        function onChapterChange(select) {
+            const newChapterForm = document.getElementById('newChapterForm');
+            newChapterForm.classList.toggle('d-none', select.value !== '__new__');
+        }
 
-            const modal = new bootstrap.Modal(document.getElementById('chunksModal'));
-            modal.show();
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return (text || '').replace(/[&<>"']/g, m => map[m]);
+        }
 
-            fetch(`?handler=Chunks&id=${docId}`)
-                .then(res => res.json())
-                .then(data => {
-                    const chunks = Array.isArray(data) ? data : (data.chunks || []);
-                    document.getElementById('chunksModalLoading').classList.add('d-none');
-                    document.getElementById('chunksModalList').classList.remove('d-none');
-                    document.getElementById('chunksSummaryText').textContent = `Tổng số chunks: ${chunks.length}`;
+        async function onUploadSubjectChange(subjectId) {
+            const uploadSelect = document.getElementById('uploadSubjectSelect');
+            const selectedOpt = uploadSelect?.options[uploadSelect.selectedIndex];
+            const desc = selectedOpt?.getAttribute('data-desc') || '';
+            const descContainer = document.getElementById('uploadSubjectDesc');
+            if (descContainer) {
+                descContainer.innerHTML = desc ? `<span><i class="bi bi-info-circle"></i> ${escapeHtml(desc)}</span>` : '';
+            }
 
-                    const container = document.getElementById('chunksModalList');
-                    if (chunks.length === 0) {
-                        container.innerHTML = '<div class="text-center py-4 text-slate-400">Không có chunk văn bản nào.</div>';
-                        return;
-                    }
-
-                    chunks.forEach((chunk, index) => {
-                        const card = document.createElement('div');
-                        card.className = 'chunk-card';
-                        card.innerHTML = `
-                            <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="badge rounded-pill bg-slate-800 text-primary-accent border border-slate-700 fs-8 font-monospace px-2.5 py-1">
-                                    Chunk #${chunk.chunkIndex || (index + 1)}
-                                </span>
-                                <span class="fs-8 text-slate-400 font-monospace">Token ước tính: ~${chunk.tokenCount || Math.ceil((chunk.content || chunk.chunkText || '').length / 4)} tokens</span>
-                            </div>
-                            <div class="chunk-content">${escapeHtml(chunk.content || chunk.chunkText || '')}</div>
-                        `;
-                        container.appendChild(card);
-                    });
+            const chapterSelect = document.getElementById('chapterSelect');
+            chapterSelect.innerHTML = '<option value="">-- Đang tải danh sách chương... --</option>';
+            try {
+                const resp = await fetch(`?handler=Chapters&subjectId=${subjectId}`);
+                const chapters = await resp.json();
+                let html = '<option value="">-- Toàn bộ môn học (không thuộc chương cụ thể) --</option>';
+                chapters.forEach(ch => {
+                    html += `<option value="${ch.id}">Ch.${ch.chapterNumber} – ${ch.title}</option>`;
                 });
-        }
-
-        function confirmDeleteDocument(docId, docTitle) {
-            if (confirm(`Bạn có chắc chắn muốn xóa tài liệu "${docTitle}" và toàn bộ chunks liên quan?`)) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = `?handler=Delete&id=${docId}`;
-
-                const afToken = document.querySelector('#afForm input[name="__RequestVerificationToken"]').value;
-                const tokenInput = document.createElement('input');
-                tokenInput.type = 'hidden';
-                tokenInput.name = '__RequestVerificationToken';
-                tokenInput.value = afToken;
-                form.appendChild(tokenInput);
-
-                document.body.appendChild(form);
-                form.submit();
+                html += '<option value="__new__">+ Tạo chương mới...</option>';
+                chapterSelect.innerHTML = html;
+                document.getElementById('newChapterForm').classList.add('d-none');
+            } catch (err) {
+                console.error('Failed to fetch chapters', err);
             }
         }
 
-        function escapeHtml(str) {
-            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        async function submitUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const alertEl = document.getElementById('uploadAlert');
+            const btn = document.getElementById('uploadSubmitBtn');
+
+            if (!fileInput.files || !fileInput.files[0]) {
+                showUploadAlert('danger', 'Vui lòng chọn file PDF, DOCX hoặc PPTX.');
+                return;
+            }
+
+            const chapterSelect = document.getElementById('chapterSelect');
+            const isNewChapter = chapterSelect.value === '__new__';
+            const selectedSubjectId = document.getElementById('uploadSubjectSelect')?.value || '@(Model.ViewModel.SelectedSubjectId ?? 0)';
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('title', document.getElementById('docTitleInput').value.trim());
+            formData.append('subjectId', selectedSubjectId);
+
+            if (isNewChapter) {
+                const num = document.getElementById('newChapterNumber').value;
+                const title = document.getElementById('newChapterTitle').value.trim();
+                if (!num || !title) {
+                    showUploadAlert('danger', 'Vui lòng nhập số chương và tên chương.');
+                    return;
+                }
+                formData.append('newChapterNumber', num);
+                formData.append('newChapterTitle', title);
+            } else if (chapterSelect.value) {
+                formData.append('chapterId', chapterSelect.value);
+            }
+
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Đang xử lý...';
+
+            try {
+                const resp = await fetch('?handler=Upload', { method: 'POST', body: formData });
+                const data = await resp.json();
+
+                if (data.success) {
+                    showUploadAlert('success', `✅ ${data.message} (${data.chunkCount} chunks — Status: ${data.status})`);
+                    if (data.subjectId) {
+                        const countEl = document.getElementById(`subject-count-${data.subjectId}`);
+                        if (countEl) {
+                            const currentCount = parseInt(countEl.getAttribute('data-count') || '0');
+                            const newCount = currentCount + 1;
+                            countEl.setAttribute('data-count', newCount);
+                            countEl.innerText = `(${newCount})`;
+                        }
+                    }
+                    setTimeout(() => {
+                        const modalEl = document.getElementById('uploadModal');
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) modal.hide();
+
+                        // Reset form state
+                        document.getElementById('fileInput').value = '';
+                        document.getElementById('docTitleInput').value = '';
+                        document.getElementById('chapterSelect').value = '';
+                        document.getElementById('dropzoneContent').classList.remove('d-none');
+                        document.getElementById('selectedFileInfo').classList.add('d-none');
+                        document.getElementById('uploadAlert').classList.add('d-none');
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-cpu-fill"></i> Xử lý &amp; Index Document';
+
+                        applyFilters();
+                    }, 1200);
+                } else {
+                    showUploadAlert('danger', `❌ ${data.message}`);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-cpu-fill"></i> Xử lý &amp; Index Document';
+                }
+            } catch (err) {
+                showUploadAlert('danger', 'Lỗi kết nối. Vui lòng thử lại.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-cpu-fill"></i> Xử lý &amp; Index Document';
+            }
+        }
+
+        function showUploadAlert(type, msg) {
+            const el = document.getElementById('uploadAlert');
+            el.className = `alert alert-${type} rounded-3 fs-7`;
+            el.innerHTML = msg;
+            el.classList.remove('d-none');
+        }
+
+        async function openManageSubjectModal() {
+            try {
+                const resp = await fetch(`?handler=ManageSubjectModalPartial&subjectId=${_activeSubjectId}`);
+                const html = await resp.text();
+                document.getElementById('manageSubjectModalRegion').innerHTML = html;
+                const modalEl = document.getElementById('manageSubjectModal');
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            } catch (err) {
+                console.error('Failed to load manage subject modal', err);
+            }
+        }
+
+        async function saveSubjectInfo() {
+            const subjectId = document.getElementById('manageSubjectId')?.value || _activeSubjectId;
+            const code = document.getElementById('subjectCodeInput').value.trim().toUpperCase();
+            const name = document.getElementById('subjectNameInput').value.trim();
+            const desc = document.getElementById('subjectDescInput').value.trim();
+
+            if (!code) {
+                showSubjectAlert('danger', 'Mã môn học không được để trống.');
+                return;
+            }
+            if (!name) {
+                showSubjectAlert('danger', 'Tên môn học không được để trống.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('subjectId', subjectId);
+            formData.append('code', code);
+            formData.append('name', name);
+            formData.append('description', desc);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            try {
+                const resp = await fetch('?handler=UpdateSubject', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.success) {
+                    showSubjectAlert('success', '✅ ' + data.message);
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showSubjectAlert('danger', '❌ ' + data.message);
+                }
+            } catch (err) {
+                showSubjectAlert('danger', 'Lỗi hệ thống. Vui lòng thử lại.');
+            }
+        }
+
+        async function deleteSubjectItem(id, code) {
+            const subjectId = id || document.getElementById('manageSubjectId')?.value || _activeSubjectId;
+            if (!subjectId) return;
+            if (!confirm(`⚠️ CẢNH BÁO: Bạn có chắc chắn muốn XÓA môn học "${code}"?\nTất cả chương và tài liệu thuộc môn học này sẽ bị XÓA VĨNH VIỄN khỏi hệ thống!`)) return;
+
+            const formData = new FormData();
+            formData.append('id', subjectId);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            try {
+                const resp = await fetch('?handler=DeleteSubject', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.success) {
+                    showSubjectAlert('success', '✅ ' + data.message);
+                    setTimeout(() => {
+                        window.location.href = '/Document/Index';
+                    }, 1000);
+                } else {
+                    showSubjectAlert('danger', '❌ ' + data.message);
+                }
+            } catch (err) {
+                showSubjectAlert('danger', 'Lỗi hệ thống. Vui lòng thử lại.');
+            }
+        }
+
+        function editChapter(id, num, title, summary) {
+            document.getElementById('editChapterId').value = id;
+            document.getElementById('editChapterNum').value = num;
+            document.getElementById('editChapterTitleInput').value = title;
+            document.getElementById('editChapterSummaryInput').value = summary;
+            document.getElementById('chapterEditTitle').innerHTML = '<i class="bi bi-pencil-square text-primary-accent"></i> Chỉnh sửa chương ' + num;
+        }
+
+        function resetChapterForm() {
+            document.getElementById('editChapterId').value = '';
+            document.getElementById('editChapterNum').value = '';
+            document.getElementById('editChapterTitleInput').value = '';
+            document.getElementById('editChapterSummaryInput').value = '';
+            document.getElementById('chapterEditTitle').innerHTML = '<i class="bi bi-plus-circle text-primary-accent"></i> Thêm chương mới';
+        }
+
+        async function saveChapterItem() {
+            const id = document.getElementById('editChapterId').value;
+            const num = document.getElementById('editChapterNum').value;
+            const title = document.getElementById('editChapterTitleInput').value.trim();
+            const summary = document.getElementById('editChapterSummaryInput').value.trim();
+
+            if (!num || !title) {
+                showSubjectAlert('danger', 'Vui lòng nhập số chương và tiêu đề chương.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('subjectId', _activeSubjectId);
+            if (id) formData.append('id', id);
+            formData.append('chapterNumber', num);
+            formData.append('title', title);
+            formData.append('summary', summary);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            try {
+                const resp = await fetch('?handler=SaveChapter', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.success) {
+                    showSubjectAlert('success', '✅ ' + data.message);
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showSubjectAlert('danger', '❌ ' + data.message);
+                }
+            } catch (err) {
+                showSubjectAlert('danger', 'Lỗi hệ thống. Vui lòng thử lại.');
+            }
+        }
+
+        async function deleteChapterItem(id) {
+            if (!confirm('Bạn có chắc chắn muốn xóa chương này? Tất cả tài liệu trong chương sẽ chuyển về trạng thái không phân chương.')) return;
+
+            const formData = new FormData();
+            formData.append('id', id);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            try {
+                const resp = await fetch('?handler=DeleteChapter', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.success) {
+                    showSubjectAlert('success', '✅ ' + data.message);
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showSubjectAlert('danger', '❌ ' + data.message);
+                }
+            } catch (err) {
+                showSubjectAlert('danger', 'Lỗi hệ thống. Vui lòng thử lại.');
+            }
+        }
+
+        function showSubjectAlert(type, msg) {
+            const el = document.getElementById('subjectAlert');
+            el.className = `alert alert-${type} alert-dismissible fade show py-2 px-3 fs-7 rounded-3`;
+            el.innerHTML = msg;
+            el.classList.remove('d-none');
+        }
+
+        async function createSubjectSubmit() {
+            const code = document.getElementById('newSubjectCode').value.trim();
+            const name = document.getElementById('newSubjectName').value.trim();
+            const desc = document.getElementById('newSubjectDesc').value.trim();
+            const alertEl = document.getElementById('createSubjectAlert');
+
+            if (!code || !name) {
+                alertEl.className = 'alert alert-danger rounded-3 fs-7 py-2 px-3';
+                alertEl.innerHTML = 'Vui lòng nhập Mã môn học và Tên môn học.';
+                alertEl.classList.remove('d-none');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('code', code);
+            formData.append('name', name);
+            formData.append('description', desc);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            try {
+                const resp = await fetch('?handler=CreateSubject', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.success) {
+                    alertEl.className = 'alert alert-success rounded-3 fs-7 py-2 px-3';
+                    alertEl.innerHTML = '✅ ' + data.message;
+                    alertEl.classList.remove('d-none');
+                    setTimeout(() => {
+                        window.location.href = '/Document/Index?selectedSubjectId=' + data.subjectId;
+                    }, 1000);
+                } else {
+                    alertEl.className = 'alert alert-danger rounded-3 fs-7 py-2 px-3';
+                    alertEl.innerHTML = '❌ ' + data.message;
+                    alertEl.classList.remove('d-none');
+                }
+            } catch (err) {
+                alertEl.className = 'alert alert-danger rounded-3 fs-7 py-2 px-3';
+                alertEl.innerHTML = 'Lỗi hệ thống. Vui lòng thử lại.';
+                alertEl.classList.remove('d-none');
+            }
         }
     </script>
 }

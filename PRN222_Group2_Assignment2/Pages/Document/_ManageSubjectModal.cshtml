@@ -1,34 +1,128 @@
+@model PRN222_Group2_Assignment1.ViewModels.DocumentManagementViewModel
+@{
+    var activeSubject = Model.Subjects.FirstOrDefault(s => s.Id == Model.SelectedSubjectId);
+}
+
+<!-- Modal 3: Manage Subject & Chapters -->
 <div class="modal fade" id="manageSubjectModal" tabindex="-1" aria-labelledby="manageSubjectModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content modal-content-dark">
-            <div class="modal-header py-3 px-4">
-                <h5 class="modal-title fs-6 fw-bold text-white d-flex align-items-center gap-2" id="manageSubjectModalLabel">
-                    <i class="bi bi-journal-plus text-primary-accent"></i> Thêm Môn học mới
+            <div class="modal-header border-bottom border-slate-800 px-4 py-3">
+                <h5 class="modal-title fw-bold text-white d-flex align-items-center gap-2" id="manageSubjectModalLabel">
+                    <i class="bi bi-gear-fill text-primary-accent"></i> Quản lý Môn học &amp; Chương (@activeSubject?.Code)
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="post" asp-page-handler="CreateSubject">
-                <div class="modal-body p-4">
+            <div class="modal-body p-4">
+                <div id="subjectAlert" class="d-none mb-3"></div>
+
+                <!-- 1. Subject Info Form -->
+                <div class="p-3 bg-slate-850 rounded-3 border border-slate-700 mb-4">
+                    <input type="hidden" id="manageSubjectId" value="@activeSubject?.Id" />
+                    <h6 class="fw-bold text-white mb-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-book-fill text-primary-accent"></i> Thông tin Môn học
+                    </h6>
                     <div class="mb-3">
-                        <label class="form-label fs-7 fw-semibold text-slate-300">Mã môn học (Subject Code)</label>
-                        <input type="text" name="Code" class="form-control fs-7 bg-slate-900 border-slate-800 text-white font-monospace text-uppercase" placeholder="VD: PRN222" required />
+                        <label class="form-label text-slate-300 fs-7 fw-semibold">Mã môn học</label>
+                        <input type="text" id="subjectCodeInput" class="form-control fs-7 text-uppercase" value="@activeSubject?.Code" maxlength="20" />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fs-7 fw-semibold text-slate-300">Tên môn học đầy đủ</label>
-                        <input type="text" name="Name" class="form-control fs-7 bg-slate-900 border-slate-800 text-white" placeholder="VD: Lập trình C# trên Windows (.NET Applications)" required />
+                        <label class="form-label text-slate-300 fs-7 fw-semibold">Tên môn học</label>
+                        <input type="text" id="subjectNameInput" class="form-control fs-7" value="@activeSubject?.Name" />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fs-7 fw-semibold text-slate-300">Mô tả môn học (Tùy chọn)</label>
-                        <textarea name="Description" class="form-control fs-7 bg-slate-900 border-slate-800 text-white" rows="3" placeholder="Mô tả nội dung chương trình môn học..."></textarea>
+                        <label class="form-label text-slate-300 fs-7 fw-semibold">Mô tả môn học</label>
+                        <textarea id="subjectDescInput" class="form-control fs-7" rows="2">@activeSubject?.Description</textarea>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <button type="button" class="btn btn-primary btn-sm rounded-2 px-3" onclick="saveSubjectInfo()">
+                            <i class="bi bi-check-circle-fill"></i> Lưu thông tin môn học
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm rounded-2 px-3" onclick="deleteSubjectItem(@activeSubject?.Id, '@activeSubject?.Code.Replace("'", "\\'")')">
+                            <i class="bi bi-trash-fill"></i> Xóa môn học này
+                        </button>
                     </div>
                 </div>
-                <div class="modal-footer py-2.5 px-4 bg-slate-900">
-                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 px-3 fs-7" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-sm btn-primary rounded-3 px-4 fs-7 fw-semibold d-flex align-items-center gap-2">
-                        <i class="bi bi-check-circle-fill"></i> Tạo Môn học
-                    </button>
+
+                <!-- 2. Chapter List & Edit -->
+                <div class="p-3 bg-slate-850 rounded-3 border border-slate-700">
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-white mb-0 d-flex align-items-center gap-2">
+                            <i class="bi bi-journal-bookmark-fill text-primary-accent"></i> Danh sách Chương / Bài giảng
+                        </h6>
+                    </div>
+
+                    <!-- Chapters Table -->
+                    <div class="table-responsive mb-3">
+                        <table class="table table-custom align-middle fs-7 mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 80px;">Chương</th>
+                                    <th>Tiêu đề chương</th>
+                                    <th>Mô tả</th>
+                                    <th class="text-end" style="width: 140px;">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="chaptersTableBody">
+                                @if (Model.Chapters.Any())
+                                {
+                                    @foreach (var ch in Model.Chapters)
+                                    {
+                                        <tr id="chapter-row-@ch.Id">
+                                            <td class="fw-bold text-primary-accent">Ch.@ch.ChapterNumber</td>
+                                            <td class="fw-semibold text-white">@ch.Title</td>
+                                            <td class="text-slate-400 fs-8">@(ch.Summary ?? "—")</td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-action-chunks py-1 px-2 me-1" onclick="editChapter(@ch.Id, @ch.ChapterNumber, '@ch.Title.Replace("'", "\\'")', '@(ch.Summary?.Replace("'", "\\'") ?? "")')">
+                                                    <i class="bi bi-pencil-fill"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-action-delete py-1 px-2" onclick="deleteChapterItem(@ch.Id)">
+                                                    <i class="bi bi-trash-fill"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center text-slate-500 py-3">Chưa có chương nào cho môn học này.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Chapter Edit Form -->
+                    <div id="chapterEditBox" class="p-3 bg-slate-900 rounded-3 border border-slate-700">
+                        <h6 class="fw-bold text-white mb-2 fs-7" id="chapterEditTitle"><i class="bi bi-plus-circle"></i> Thêm chương mới</h6>
+                        <input type="hidden" id="editChapterId" value="" />
+                        <div class="row g-2 mb-2">
+                            <div class="col-3">
+                                <label class="form-label text-slate-400 fs-8">Số chương</label>
+                                <input type="number" id="editChapterNum" class="form-control form-control-sm fs-8" min="1" placeholder="1" />
+                            </div>
+                            <div class="col-9">
+                                <label class="form-label text-slate-400 fs-8">Tiêu đề chương</label>
+                                <input type="text" id="editChapterTitleInput" class="form-control form-control-sm fs-8" placeholder="Ví dụ: Chapter 1: Introduction" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-slate-400 fs-8">Tóm tắt nội dung (không bắt buộc)</label>
+                            <input type="text" id="editChapterSummaryInput" class="form-control form-control-sm fs-8" placeholder="Nội dung chính..." />
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-primary btn-sm rounded-2 px-3" onclick="saveChapterItem()">
+                                <i class="bi bi-check-lg"></i> Lưu chương
+                            </button>
+                            <button type="button" class="btn btn-slate-800 text-slate-400 btn-sm rounded-2 px-3" onclick="resetChapterForm()">Hủy</button>
+                        </div>
+                    </div>
                 </div>
-            </form>
+            </div>
+            <div class="modal-footer border-top border-slate-800 px-4 py-3">
+                <button type="button" class="btn btn-slate-800 text-slate-300 border-slate-700 rounded-3" data-bs-dismiss="modal">Đóng</button>
+            </div>
         </div>
     </div>
 </div>

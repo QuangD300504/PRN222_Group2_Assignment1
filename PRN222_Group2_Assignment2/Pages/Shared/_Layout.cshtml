@@ -1,113 +1,106 @@
-@{
-    var userEmail = Context.Session.GetString("UserEmail");
-    var userRole = Context.Session.GetString("UserRole");
-    var userId = Context.Session.GetString("UserId");
-    var isLoggedIn = !string.IsNullOrEmpty(userEmail);
-}
 <!DOCTYPE html>
-<html lang="vi" data-bs-theme="dark">
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - RAG Syllabus Knowledge Base (Razor Pages)</title>
-    <!-- Google Fonts -->
+    <title>@ViewData["Title"] - AI Study Hub</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Bootstrap 5 CSS & Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <!-- Custom Theme CSS -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
-    <!-- Top Global Header Navbar -->
-    <header>
-        <nav class="navbar navbar-expand-lg navbar-dark navbar-custom py-2.5">
+    <header class="sticky-top">
+        <nav class="navbar navbar-expand-lg navbar-dark navbar-custom py-2">
             <div class="container-fluid px-4">
-                <!-- Brand Logo -->
-                <a class="navbar-brand d-flex align-items-center gap-2.5" href="/Document/Index">
-                    <div class="brand-icon-box rounded-3 d-flex align-items-center justify-content-center">
-                        <i class="bi bi-cpu-fill fs-6"></i>
-                    </div>
-                    <div class="d-flex flex-column">
-                        <span class="fw-bold tracking-tight text-white fs-6 lh-1">RAG Knowledge Engine</span>
-                        <span class="fs-8 text-slate-400 fw-medium">Syllabus Indexing System (Razor Pages)</span>
-                    </div>
+                <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-white fs-5" asp-page="/Document/Index">
+                    <span class="brand-icon-box rounded-3 d-inline-flex align-items-center justify-content-center text-white">
+                        <i class="bi bi-cpu-fill fs-5"></i>
+                    </span>
+                    <span>AI Study <span class="text-primary-accent">Hub</span></span>
                 </a>
 
-                <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+                <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
                 <div class="collapse navbar-collapse" id="navbarMain">
-                    @if (isLoggedIn)
-                    {
-                        <!-- Primary Navigation Links -->
-                        <ul class="navbar-nav me-auto ms-4 mb-2 mb-lg-0 gap-1">
-                            <li class="nav-item">
-                                <a class="nav-link px-3 py-1-5 rounded-3 fs-7 fw-medium d-flex align-items-center gap-2 @(ViewData["ActivePage"]?.ToString() == "Document" ? "active bg-slate-800 text-white" : "text-slate-400 hover-text-white")"
-                                   href="/Document/Index">
-                                    <i class="bi bi-folder-symlink"></i> Quản lý Tài liệu
-                                </a>
-                            </li>
-                        </ul>
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 gap-1">
+                        <li class="nav-item">
+                            <a class="nav-link px-3 rounded-2 d-flex align-items-center gap-2 active fw-semibold text-white btn-primary" asp-page="/Document/Index">
+                                <i class="bi bi-folder-symlink-fill text-white"></i> Documents &amp; Indexing
+                            </a>
+                        </li>
+                    </ul>
 
-                        <!-- User Profile Pill & Logout -->
-                        <div class="d-flex align-items-center gap-3 ms-auto">
+                    <div class="d-flex align-items-center gap-3">
+                        @if (Context.Session.GetString("UserEmail") != null)
+                        {
                             <div class="dropdown">
-                                <button class="btn user-profile-btn rounded-pill px-3 py-1.5 fs-7 d-flex align-items-center gap-2"
-                                        type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <div class="avatar-sm rounded-circle bg-primary-accent d-flex align-items-center justify-content-center fw-bold">
-                                        @(userEmail?.Substring(0, 1).ToUpper() ?? "U")
-                                    </div>
-                                    <span class="fw-medium user-name">@userEmail</span>
-                                    <span class="badge rounded-pill bg-slate-800 text-slate-300 border border-slate-700 fs-8 fw-semibold px-2 py-0.5">
-                                        @userRole
+                                <button class="btn user-profile-btn dropdown-toggle d-flex align-items-center gap-2 rounded-pill px-3 py-1-5 fs-7" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <span class="avatar-sm rounded-circle text-white d-inline-flex align-items-center justify-content-center fw-bold" style="background-color: var(--signal-blue);">
+                                        @(Context.Session.GetString("UserName")?[0] ?? 'U')
                                     </span>
-                                    <i class="bi bi-chevron-down fs-8 text-slate-400 ms-1"></i>
+                                    <span class="fw-semibold user-name">@Context.Session.GetString("UserName")</span>
+                                    <span class="badge rounded-pill fs-8 ms-1" style="background: var(--signal-blue-subtle); color: #80b3ff; border: 1px solid var(--signal-blue-border);">@Context.Session.GetString("UserRole")</span>
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-end shadow-lg user-dropdown-menu mt-2">
+                                <ul class="dropdown-menu dropdown-menu-end user-dropdown-menu shadow-lg mt-2" aria-labelledby="userMenu">
                                     <li class="px-3 py-2 border-bottom border-slate-800">
-                                        <div class="fs-8 text-slate-400">Đăng nhập với vai trò</div>
-                                        <div class="fw-bold fs-7 text-white mt-0.5">@userRole</div>
+                                        <div class="fw-semibold text-white">@Context.Session.GetString("UserName")</div>
+                                        <div class="user-email fs-8">@Context.Session.GetString("UserEmail")</div>
                                     </li>
                                     <li>
-                                        <a class="dropdown-item px-3 py-2 fs-7 d-flex align-items-center gap-2 text-danger mt-1" href="/Auth/Logout">
-                                            <i class="bi bi-box-arrow-right"></i> Đăng xuất
-                                        </a>
+                                        <form asp-page="/Auth/Logout" method="post" class="m-0">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="dropdown-item text-danger d-flex align-items-center gap-2 py-2">
+                                                <i class="bi bi-box-arrow-right"></i> Sign Out
+                                            </button>
+                                        </form>
                                     </li>
                                 </ul>
                             </div>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="ms-auto">
-                            <a href="/Auth/Login" class="btn btn-sm btn-primary rounded-pill px-3 py-1.5">
-                                <i class="bi bi-box-arrow-in-right"></i> Đăng nhập
-                            </a>
-                        </div>
-                    }
+                        }
+                        else
+                        {
+                            <a class="btn btn-outline-primary btn-sm px-3 rounded-pill" asp-page="/Auth/Login">Sign In</a>
+                        }
+                    </div>
                 </div>
             </div>
         </nav>
     </header>
 
-    <!-- Main Content Container -->
-    <main role="main" class="flex-grow-1 py-4">
-        @RenderBody()
-    </main>
+    <div class="app-body">
+        <main role="main" class="pb-5">
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="container-fluid px-4 mt-3">
+                    <div class="alert alert-success alert-dismissible fade show bg-success-subtle text-success border-0 rounded-3 shadow-sm d-flex align-items-center gap-2" role="alert">
+                        <i class="bi bi-check-circle-fill fs-5"></i>
+                        <div>@TempData["SuccessMessage"]</div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                </div>
+            }
+            @if (TempData["ErrorMessage"] != null)
+            {
+                <div class="container-fluid px-4 mt-3">
+                    <div class="alert alert-danger alert-dismissible fade show bg-danger-subtle text-danger border-0 rounded-3 shadow-sm d-flex align-items-center gap-2" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                        <div>@TempData["ErrorMessage"]</div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                </div>
+            }
+            @RenderBody()
+        </main>
+    </div>
 
-    <!-- Footer -->
-    <footer class="footer mt-auto py-3 border-top border-slate-800 bg-slate-900">
-        <div class="container-fluid px-4 text-center text-slate-400 fs-8">
-            PRN222 Group 2 - Assignment 2 (Razor Pages Architecture) &copy; 2026
-        </div>
-    </footer>
-
-    <!-- Bootstrap 5 Bundle JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
