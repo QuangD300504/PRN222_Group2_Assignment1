@@ -10,6 +10,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Chapter> Chapters => Set<Chapter>();
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<DocumentChunk> DocumentChunks => Set<DocumentChunk>();
+    public DbSet<ChatSession> ChatSessions => Set<ChatSession>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -56,6 +58,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(c => c.Document)
              .WithMany(d => d.Chunks)
              .HasForeignKey(c => c.DocumentId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatSession>(e =>
+        {
+            e.HasOne(s => s.Subject)
+             .WithMany()
+             .HasForeignKey(s => s.SubjectId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(s => s.User)
+             .WithMany()
+             .HasForeignKey(s => s.UserId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatMessage>(e =>
+        {
+            e.HasOne(m => m.Session)
+             .WithMany(s => s.Messages)
+             .HasForeignKey(m => m.SessionId)
              .OnDelete(DeleteBehavior.Cascade);
         });
 

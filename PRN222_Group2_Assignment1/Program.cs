@@ -14,6 +14,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // ── Services ─────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IRagChatService, RagChatService>();
+builder.Services.AddHttpClient();
 
 // ── Session (used for login state) ───────────────────────────────────────────
 builder.Services.AddHttpContextAccessor();
