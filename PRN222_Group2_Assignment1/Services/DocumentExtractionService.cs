@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
-using UglyToad.PdfPig;
-using UglyToad.PdfPig.Content;
+using PdfPigDoc = UglyToad.PdfPig.PdfDocument;
+using WinPdfDoc = Windows.Data.Pdf.PdfDocument;
+using Windows.Media.Ocr;
+using Windows.Storage.Streams;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using DocumentFormat.OpenXml.Presentation;
@@ -13,6 +15,7 @@ namespace PRN222_Group2_Assignment1.Services;
 /// <summary>
 /// Extracts text from PDF, DOCX, and PPTX into structured page-aware blocks.
 /// Returns a flat list of (pageNumber, heading, text) tuples ready for chunking.
+/// Includes Windows Native PDF Renderer + OCR Fallback for scanned/vector-drawn PDFs.
 /// </summary>
 public static class DocumentExtractionService
 {
@@ -38,27 +41,89 @@ public static class DocumentExtractionService
     private static List<TextBlock> ExtractPdf(byte[] bytes)
     {
         var blocks = new List<TextBlock>();
-        using var doc = PdfDocument.Open(bytes);
-
-        foreach (var page in doc.GetPages())
+        try
         {
-            // Group words into lines by Y-coordinate bucket (~3 pt line threshold)
-            var lines = page.GetWords()
-                .GroupBy(w => Math.Round(w.BoundingBox.Bottom / 3.0, 0) * 3)
-                .OrderByDescending(g => g.Key)
-                .Select(g => string.Join(" ", g.OrderBy(w => w.BoundingBox.Left).Select(w => w.Text)))
-                .Where(l => !string.IsNullOrWhiteSpace(l))
-                .ToList();
+            using var doc = PdfPigDoc.Open(bytes);
 
-            if (lines.Count == 0) continue;
+            foreach (var page in doc.GetPages())
+            {
+                // Group words into lines by Y-coordinate bucket (~3 pt line threshold)
+                var lines = page.GetWords()
+                    .GroupBy(w => Math.Round(w.BoundingBox.Bottom / 3.0, 0) * 3)
+                    .OrderByDescending(g => g.Key)
+                    .Select(g => string.Join(" ", g.OrderBy(w => w.BoundingBox.Left).Select(w => w.Text)))
+                    .Where(l => !string.IsNullOrWhiteSpace(l))
+                    .ToList();
 
-            string? heading = IsLikelyHeading(lines[0]) ? lines[0] : null;
-            string text = string.Join("\n", lines); // Include full line text so headings are preserved
+                if (lines.Count == 0) continue;
 
-            if (!string.IsNullOrWhiteSpace(text))
-                blocks.Add(new TextBlock(page.Number, heading, text));
+                string? heading = IsLikelyHeading(lines[0]) ? lines[0] : null;
+                string text = string.Join("\n", lines); // Include full line text so headings are preserved
+
+                if (!string.IsNullOrWhiteSpace(text))
+                    blocks.Add(new TextBlock(page.Number, heading, text));
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[PdfPig Extraction Warning] {ex.Message}");
         }
 
+        // If standard text extraction produced 0 words (e.g. vector-drawn PDF or scanned bitmap PDF),
+        // fallback to Windows Native PDF Renderer + Windows.Media.Ocr Engine!
+        if (blocks.Count == 0 || blocks.All(b => string.IsNullOrWhiteSpace(b.Text)))
+        {
+            var ocrBlocks = ExtractPdfOcrFallback(bytes);
+            if (ocrBlocks.Count > 0)
+                return ocrBlocks;
+        }
+
+        return blocks;
+    }
+
+    private static List<TextBlock> ExtractPdfOcrFallback(byte[] bytes)
+    {
+        var blocks = new List<TextBlock>();
+        try
+        {
+            var task = Task.Run(async () =>
+            {
+                using var stream = new MemoryStream(bytes);
+                using var randomAccessStream = stream.AsRandomAccessStream();
+                var pdfDoc = await WinPdfDoc.LoadFromStreamAsync(randomAccessStream);
+
+                var ocrEngine = OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en-US"))
+                                ?? OcrEngine.TryCreateFromUserProfileLanguages();
+
+                if (ocrEngine is null) return blocks;
+
+                for (uint i = 0; i < pdfDoc.PageCount; i++)
+                {
+                    using var page = pdfDoc.GetPage(i);
+                    using var imgStream = new InMemoryRandomAccessStream();
+                    await page.RenderToStreamAsync(imgStream);
+
+                    var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(imgStream);
+                    using var softwareBitmap = await decoder.GetSoftwareBitmapAsync();
+
+                    var ocrResult = await ocrEngine.RecognizeAsync(softwareBitmap);
+                    var text = ocrResult.Text?.Trim();
+
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                        string? heading = lines.Length > 0 && IsLikelyHeading(lines[0]) ? lines[0] : null;
+                        blocks.Add(new TextBlock((int)(i + 1), heading, text));
+                    }
+                }
+                return blocks;
+            });
+            return task.GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[PDF OCR Fallback Error] {ex.Message}");
+        }
         return blocks;
     }
 
