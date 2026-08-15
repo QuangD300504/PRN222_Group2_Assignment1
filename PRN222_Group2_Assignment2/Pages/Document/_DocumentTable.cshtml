@@ -198,36 +198,3 @@
         }
     </div>
 </div>
-
-<script>
-    function applyFilters() {
-        const subjectId = document.getElementById('filterSubjectId')?.value
-            || (typeof _activeSubjectId !== 'undefined' ? _activeSubjectId : 0);
-        const chapterId = document.getElementById('filterChapterId')?.value ?? '';
-        const fileType  = document.getElementById('filterFileType')?.value ?? '';
-        const search    = document.getElementById('filterSearch')?.value ?? '';
-
-        const params = new URLSearchParams({ subjectId });
-        if (chapterId) params.set('chapterId', chapterId);
-        if (fileType)  params.set('fileType', fileType);
-        if (search)    params.set('search', search);
-
-        const region = document.getElementById('doc-partial-region');
-        region.style.opacity = '0.4';
-        fetch(`?handler=DocumentsPartial&${params}`)
-            .then(r => r.text())
-            .then(html => { region.innerHTML = html; region.style.opacity = '1'; })
-            .catch(() => { region.style.opacity = '1'; });
-    }
-
-    function clearFilters() {
-        const subjectId = document.getElementById('filterSubjectId')?.value
-            || (typeof _activeSubjectId !== 'undefined' ? _activeSubjectId : 0);
-        const region = document.getElementById('doc-partial-region');
-        region.style.opacity = '0.4';
-        fetch(`?handler=DocumentsPartial&subjectId=${subjectId}`)
-            .then(r => r.text())
-            .then(html => { region.innerHTML = html; region.style.opacity = '1'; })
-            .catch(() => { region.style.opacity = '1'; });
-    }
-</script>

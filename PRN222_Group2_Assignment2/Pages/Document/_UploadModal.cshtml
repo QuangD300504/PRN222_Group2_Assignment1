@@ -16,6 +16,23 @@
             <div class="modal-body p-4">
                 <div id="uploadAlert" class="d-none mb-3"></div>
 
+                <!-- SignalR Real-Time Progress Bar -->
+                <div id="uploadProgressContainer" class="d-none mb-3 p-3 bg-slate-850 rounded-3 border border-slate-700">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fs-8 fw-bold text-primary-accent d-flex align-items-center gap-1">
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                            <span id="uploadProgressTitle">Đang xử lý tài liệu...</span>
+                        </span>
+                        <span class="fs-8 fw-bold text-white" id="uploadProgressPercent">0%</span>
+                    </div>
+                    <div class="progress mb-2" style="height: 6px; background-color: rgba(255,255,255,0.08);">
+                        <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-gradient-primary" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div class="fs-8 text-slate-400 d-flex align-items-center gap-1" id="uploadProgressDetail">
+                        <i class="bi bi-broadcast text-primary-accent"></i> <span id="uploadProgressMsg">Đang chuẩn bị...</span>
+                    </div>
+                </div>
+
                 <div class="upload-dropzone mb-3" onclick="document.getElementById('fileInput').click()">
                     <input type="file" id="fileInput" class="d-none" accept=".pdf,.docx,.pptx" onchange="updateFilePreview(this)" />
                     <div id="dropzoneContent">

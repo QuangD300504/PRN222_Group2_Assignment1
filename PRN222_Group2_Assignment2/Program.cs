@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PRN222_Group2_Assignment1.Data;
 using PRN222_Group2_Assignment1.Services;
+using PRN222_Group2_Assignment2.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +17,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IRagChatService, RagChatService>();
+builder.Services.AddHttpClient();
+
+builder.Services.AddSignalR();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -47,5 +52,6 @@ app.UseSession();
 app.UseAuthorization();
 
 app.MapRazorPages();
+app.MapHub<DocumentHub>("/documentHub");
 
 app.Run();
