@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.SignalR;
 using PRN222_Group2_Assignment1.Services;
 using PRN222_Group2_Assignment1.ViewModels;
+using PRN222_Group2_Assignment2.Hubs;
 
 namespace PRN222_Group2_Assignment2.Pages.Document
 {
@@ -9,11 +11,13 @@ namespace PRN222_Group2_Assignment2.Pages.Document
     {
         private readonly IDocumentService _documentService;
         private readonly IWebHostEnvironment _env;
+        private readonly IHubContext<DocumentHub> _hubContext;
 
-        public IndexModel(IDocumentService documentService, IWebHostEnvironment env)
+        public IndexModel(IDocumentService documentService, IWebHostEnvironment env, IHubContext<DocumentHub> hubContext)
         {
             _documentService = documentService;
             _env = env;
+            _hubContext = hubContext;
         }
 
         public DocumentManagementViewModel ViewModel { get; set; } = new DocumentManagementViewModel();
@@ -58,18 +62,47 @@ namespace PRN222_Group2_Assignment2.Pages.Document
             return new JsonResult(chapters);
         }
 
-        public async Task<IActionResult> OnPostUploadAsync([FromForm] UploadDocumentViewModel input)
+        public async Task<IActionResult> OnPostUploadAsync([FromForm] UploadDocumentViewModel input, [FromForm] string? connectionId)
         {
             if (!IsSubjectLeader())
             {
                 return new JsonResult(new { success = false, message = "Chỉ có Subject Leader mới có quyền tải lên tài liệu." });
             }
 
+            if (!string.IsNullOrEmpty(connectionId))
+            {
+                await _hubContext.Clients.Client(connectionId).SendAsync("UploadProgress", 20, "1/4: Đang đọc tệp và tính toán mã băm SHA-256...");
+            }
+
             var userIdStr = HttpContext.Session.GetString("UserId") ?? HttpContext.Session.GetInt32("UserId")?.ToString();
             int userId = int.TryParse(userIdStr, out var parsedId) ? parsedId : 1;
 
+            if (!string.IsNullOrEmpty(connectionId))
+            {
+                await _hubContext.Clients.Client(connectionId).SendAsync("UploadProgress", 50, "2/4: Đang trích xuất nội dung trang và nhận dạng OCR...");
+            }
+
             var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads");
             var (success, message, document) = await _documentService.UploadDocumentAsync(input, userId, uploadsFolder);
+
+            if (!string.IsNullOrEmpty(connectionId))
+            {
+                await _hubContext.Clients.Client(connectionId).SendAsync("UploadProgress", 85, "3/4: Đang phân mảnh văn bản với thuật toán Sliding Window...");
+            }
+
+            int newDocCount = 0;
+            if (success && document != null)
+            {
+                var refreshedData = await _documentService.GetDocumentManagementDataAsync(input.SubjectId, null, null, null);
+                newDocCount = refreshedData.Documents.Count;
+
+                if (!string.IsNullOrEmpty(connectionId))
+                {
+                    await _hubContext.Clients.Client(connectionId).SendAsync("UploadProgress", 100, "4/4: Đã lưu trữ và lập chỉ mục hoàn tất!");
+                }
+
+                await _hubContext.Clients.All.SendAsync("DocumentUploaded", input.SubjectId, document.Title, newDocCount);
+            }
 
             return new JsonResult(new
             {
@@ -77,7 +110,8 @@ namespace PRN222_Group2_Assignment2.Pages.Document
                 message,
                 chunkCount = document?.ChunkCount,
                 status = document?.Status,
-                subjectId = input.SubjectId
+                subjectId = input.SubjectId,
+                newDocCount
             });
         }
 
@@ -93,6 +127,10 @@ namespace PRN222_Group2_Assignment2.Pages.Document
             if (result)
             {
                 TempData["SuccessMessage"] = "Xóa tài liệu và dữ liệu chunks thành công!";
+                var refreshedData = await _documentService.GetDocumentManagementDataAsync(subjectId, null, null, null);
+                int newDocCount = refreshedData.Documents.Count;
+
+                await _hubContext.Clients.All.SendAsync("DocumentDeleted", subjectId ?? 0, id, newDocCount);
             }
             else
             {
@@ -114,6 +152,10 @@ namespace PRN222_Group2_Assignment2.Pages.Document
                 return new JsonResult(new { success = false, message = "Tên môn học không được để trống." });
 
             var (success, message) = await _documentService.UpdateSubjectAsync(subjectId, code, name, description);
+            if (success)
+            {
+                await _hubContext.Clients.All.SendAsync("SubjectUpdated", subjectId, "UPDATED");
+            }
             return new JsonResult(new { success, message });
         }
 
@@ -130,6 +172,10 @@ namespace PRN222_Group2_Assignment2.Pages.Document
             }
 
             var (success, message, subject) = await _documentService.CreateSubjectAsync(code, name, description);
+            if (success && subject != null)
+            {
+                await _hubContext.Clients.All.SendAsync("SubjectUpdated", subject.Id, "CREATED");
+            }
             return new JsonResult(new { success, message, subjectId = subject?.Id });
         }
 
@@ -147,6 +193,10 @@ namespace PRN222_Group2_Assignment2.Pages.Document
             }
 
             var (success, message) = await _documentService.DeleteSubjectAsync(id);
+            if (success)
+            {
+                await _hubContext.Clients.All.SendAsync("SubjectUpdated", id, "DELETED");
+            }
             return new JsonResult(new { success, message });
         }
 
@@ -159,6 +209,10 @@ namespace PRN222_Group2_Assignment2.Pages.Document
                 return new JsonResult(new { success = false, message = "Vui lòng nhập số chương hợp lệ và tiêu đề chương." });
 
             var (success, message) = await _documentService.SaveChapterAsync(subjectId, id, chapterNumber, title, summary);
+            if (success)
+            {
+                await _hubContext.Clients.All.SendAsync("SubjectUpdated", subjectId, "CHAPTER_SAVED");
+            }
             return new JsonResult(new { success, message });
         }
 
@@ -168,6 +222,10 @@ namespace PRN222_Group2_Assignment2.Pages.Document
                 return new JsonResult(new { success = false, message = "Only Subject Leaders can delete chapters." });
 
             var (success, message) = await _documentService.DeleteChapterAsync(id);
+            if (success)
+            {
+                await _hubContext.Clients.All.SendAsync("SubjectUpdated", 0, "CHAPTER_DELETED");
+            }
             return new JsonResult(new { success, message });
         }
     }

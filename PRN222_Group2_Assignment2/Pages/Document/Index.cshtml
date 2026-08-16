@@ -33,6 +33,15 @@
         </div>
     </div>
 
+    <!-- Concurrent Editing Live Banner (SignalR) -->
+    <div id="concurrentEditBanner" class="d-none alert alert-warning border-0 rounded-3 py-2 px-3 mb-3 d-flex align-items-center justify-content-between shadow-sm">
+        <div class="d-flex align-items-center gap-2 fs-7">
+            <span class="spinner-grow spinner-grow-sm text-warning" role="status"></span>
+            <span id="concurrentEditMessage" class="text-warning-emphasis"></span>
+        </div>
+        <span class="badge bg-warning-subtle text-warning border border-warning-subtle fs-8"><i class="bi bi-broadcast"></i> Live Sync</span>
+    </div>
+
     <!-- Subject Selection Pills & Create Subject Bar -->
     <div class="d-flex flex-column gap-2 mb-4 bg-slate-850 p-3 rounded-3 border border-slate-800">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -329,7 +338,19 @@
                 formData.append('chapterId', chapterSelect.value);
             }
 
+            formData.append('connectionId', (typeof signalrConn !== 'undefined' && signalrConn?.connectionId) ? signalrConn.connectionId : '');
             formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+
+            const progressContainer = document.getElementById('uploadProgressContainer');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const progressPercent = document.getElementById('uploadProgressPercent');
+            const progressMsg = document.getElementById('uploadProgressMsg');
+            if (progressContainer) {
+                progressContainer.classList.remove('d-none');
+                if (progressBar) progressBar.style.width = '10%';
+                if (progressPercent) progressPercent.innerText = '10%';
+                if (progressMsg) progressMsg.innerText = 'Đang tải tệp lên máy chủ...';
+            }
 
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Đang xử lý...';
@@ -340,13 +361,11 @@
 
                 if (data.success) {
                     showUploadAlert('success', `✅ ${data.message} (${data.chunkCount} chunks — Status: ${data.status})`);
-                    if (data.subjectId) {
+                    if (data.subjectId && data.newDocCount !== undefined) {
                         const countEl = document.getElementById(`subject-count-${data.subjectId}`);
                         if (countEl) {
-                            const currentCount = parseInt(countEl.getAttribute('data-count') || '0');
-                            const newCount = currentCount + 1;
-                            countEl.setAttribute('data-count', newCount);
-                            countEl.innerText = `(${newCount})`;
+                            countEl.setAttribute('data-count', data.newDocCount);
+                            countEl.innerText = `(${data.newDocCount})`;
                         }
                     }
                     setTimeout(() => {
@@ -361,6 +380,7 @@
                         document.getElementById('dropzoneContent').classList.remove('d-none');
                         document.getElementById('selectedFileInfo').classList.add('d-none');
                         document.getElementById('uploadAlert').classList.add('d-none');
+                        if (progressContainer) progressContainer.classList.add('d-none');
                         btn.disabled = false;
                         btn.innerHTML = '<i class="bi bi-cpu-fill"></i> Xử lý &amp; Index Document';
 
@@ -368,11 +388,13 @@
                     }, 1200);
                 } else {
                     showUploadAlert('danger', `❌ ${data.message}`);
+                    if (progressContainer) progressContainer.classList.add('d-none');
                     btn.disabled = false;
                     btn.innerHTML = '<i class="bi bi-cpu-fill"></i> Xử lý &amp; Index Document';
                 }
             } catch (err) {
                 showUploadAlert('danger', 'Lỗi kết nối. Vui lòng thử lại.');
+                if (progressContainer) progressContainer.classList.add('d-none');
                 btn.disabled = false;
                 btn.innerHTML = '<i class="bi bi-cpu-fill"></i> Xử lý &amp; Index Document';
             }
@@ -392,6 +414,21 @@
                 document.getElementById('manageSubjectModalRegion').innerHTML = html;
                 const modalEl = document.getElementById('manageSubjectModal');
                 const modal = new bootstrap.Modal(modalEl);
+
+                // Notify others via SignalR that editing started
+                const currentUserName = '@(HttpContext.Session.GetString("UserName") ?? "Subject Leader")';
+                const activeSubjectCode = document.getElementById('subjectCodeBadge')?.innerText || '';
+                if (typeof signalrConn !== 'undefined' && signalrConn?.state === signalR.HubConnectionState.Connected) {
+                    signalrConn.invoke("NotifyEditingSubject", _activeSubjectId, activeSubjectCode, currentUserName).catch(console.error);
+                }
+
+                modalEl.addEventListener('hidden.bs.modal', function onModalHidden() {
+                    if (typeof signalrConn !== 'undefined' && signalrConn?.state === signalR.HubConnectionState.Connected) {
+                        signalrConn.invoke("NotifyFinishedEditingSubject", _activeSubjectId, currentUserName).catch(console.error);
+                    }
+                    modalEl.removeEventListener('hidden.bs.modal', onModalHidden);
+                });
+
                 modal.show();
             } catch (err) {
                 console.error('Failed to load manage subject modal', err);
@@ -475,23 +512,25 @@
             document.getElementById('chapterEditTitle').innerHTML = '<i class="bi bi-plus-circle text-primary-accent"></i> Thêm chương mới';
         }
 
-        async function saveChapterItem() {
-            const id = document.getElementById('editChapterId').value;
-            const num = document.getElementById('editChapterNum').value;
-            const title = document.getElementById('editChapterTitleInput').value.trim();
-            const summary = document.getElementById('editChapterSummaryInput').value.trim();
+        async function saveChapterItem(chapterId) {
+            const subjectId = document.getElementById('manageSubjectId')?.value || _activeSubjectId;
+            const isNew = !chapterId;
+            const prefix = isNew ? 'new_' : `edit_${chapterId}_`;
+            const num = document.getElementById(`${prefix}num`).value;
+            const title = document.getElementById(`${prefix}title`).value.trim();
+            const summary = document.getElementById(`${prefix}summary`)?.value.trim();
 
             if (!num || !title) {
-                showSubjectAlert('danger', 'Vui lòng nhập số chương và tiêu đề chương.');
+                showSubjectAlert('danger', 'Vui lòng nhập đầy đủ Số chương và Tiêu đề chương.');
                 return;
             }
 
             const formData = new FormData();
-            formData.append('subjectId', _activeSubjectId);
-            if (id) formData.append('id', id);
+            formData.append('subjectId', subjectId);
+            if (!isNew) formData.append('id', chapterId);
             formData.append('chapterNumber', num);
             formData.append('title', title);
-            formData.append('summary', summary);
+            if (summary) formData.append('summary', summary);
             formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
 
             try {
@@ -508,11 +547,11 @@
             }
         }
 
-        async function deleteChapterItem(id) {
-            if (!confirm('Bạn có chắc chắn muốn xóa chương này? Tất cả tài liệu trong chương sẽ chuyển về trạng thái không phân chương.')) return;
+        async function deleteChapterItem(chapterId, title) {
+            if (!confirm(`Bạn có chắc chắn muốn xóa chương "${title}"?\nCác tài liệu thuộc chương này sẽ được chuyển về "Toàn bộ môn học".`)) return;
 
             const formData = new FormData();
-            formData.append('id', id);
+            formData.append('id', chapterId);
             formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
 
             try {
@@ -575,6 +614,113 @@
                 alertEl.innerHTML = 'Lỗi hệ thống. Vui lòng thử lại.';
                 alertEl.classList.remove('d-none');
             }
+        }
+    </script>
+
+    <!-- SignalR Real-Time Client Integration -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <script>
+        // Initialize SignalR WebSocket connection
+        const signalrConn = new signalR.HubConnectionBuilder()
+            .withUrl("/documentHub")
+            .withAutomaticReconnect()
+            .build();
+
+        // 1. Real-time Document Uploaded Handler
+        signalrConn.on("DocumentUploaded", function (subjectId, title, newDocCount) {
+            showSignalRToast(`📢 Tài liệu mới "${title}" vừa được tải lên!`, 'success');
+            
+            // Live update subject counter badge
+            if (subjectId && newDocCount !== undefined) {
+                const countEl = document.getElementById(`subject-count-${subjectId}`);
+                if (countEl) {
+                    countEl.setAttribute('data-count', newDocCount);
+                    countEl.innerText = `(${newDocCount})`;
+                }
+            }
+            
+            refreshCurrentSubjectTable(subjectId);
+        });
+
+        // 2. Real-time Document Deleted Handler
+        signalrConn.on("DocumentDeleted", function (subjectId, docId, newDocCount) {
+            showSignalRToast(`📢 Một tài liệu vừa bị xóa khỏi hệ thống!`, 'warning');
+            
+            // Live update subject counter badge
+            if (subjectId && newDocCount !== undefined) {
+                const countEl = document.getElementById(`subject-count-${subjectId}`);
+                if (countEl) {
+                    countEl.setAttribute('data-count', newDocCount);
+                    countEl.innerText = `(${newDocCount})`;
+                }
+            }
+            
+            refreshCurrentSubjectTable(subjectId);
+        });
+
+        // 3. Real-time Subject/Chapter Updated Handler
+        signalrConn.on("SubjectUpdated", function (subjectId, actionType) {
+            showSignalRToast(`📢 Dữ liệu môn học / chương vừa được cập nhật (${actionType})!`, 'info');
+            setTimeout(() => window.location.reload(), 1500);
+        });
+
+        // 4. Real-time Upload & Chunking Progress Telemetry
+        signalrConn.on("UploadProgress", function (percent, msg) {
+            const progressContainer = document.getElementById('uploadProgressContainer');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const progressPercent = document.getElementById('uploadProgressPercent');
+            const progressMsg = document.getElementById('uploadProgressMsg');
+            if (progressContainer) {
+                progressContainer.classList.remove('d-none');
+                if (progressBar) progressBar.style.width = percent + '%';
+                if (progressPercent) progressPercent.innerText = percent + '%';
+                if (progressMsg) progressMsg.innerText = msg;
+            }
+        });
+
+        // 5. Concurrent Editing Indicator
+        signalrConn.on("UserEditingSubject", function (userName, subjectId, subjectCode) {
+            const banner = document.getElementById('concurrentEditBanner');
+            const msg = document.getElementById('concurrentEditMessage');
+            if (banner && msg) {
+                msg.innerHTML = `<strong>${escapeHtml(userName || 'Subject Leader')}</strong> đang thực hiện chỉnh sửa cấu trúc môn học <strong>${escapeHtml(subjectCode || '')}</strong>...`;
+                banner.classList.remove('d-none');
+            }
+        });
+
+        signalrConn.on("UserFinishedEditingSubject", function (userName, subjectId) {
+            const banner = document.getElementById('concurrentEditBanner');
+            if (banner) {
+                banner.classList.add('d-none');
+            }
+        });
+
+        // Start Connection
+        signalrConn.start().then(() => {
+            console.log("✅ SignalR connected to /documentHub. ConnectionId:", signalrConn.connectionId);
+        }).catch(err => console.error("SignalR connection error:", err));
+
+        // Helper to refresh table without full page reload
+        function refreshCurrentSubjectTable(evtSubjectId) {
+            const activeSubBtn = document.querySelector('.btn-primary[data-subject-id]');
+            const currentSubId = activeSubBtn ? activeSubBtn.getAttribute('data-subject-id') : null;
+            if (!evtSubjectId || evtSubjectId == currentSubId) {
+                const searchInput = document.getElementById('searchQueryInput');
+                const typeFilter = document.getElementById('fileTypeFilter');
+                const searchVal = searchInput ? searchInput.value : '';
+                const typeVal = typeFilter ? typeFilter.value : '';
+                fetchDocumentsPartial(currentSubId, null, searchVal, typeVal);
+            }
+        }
+
+        // Helper to render instant floating toast alert
+        function showSignalRToast(msg, type) {
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type} alert-dismissible fade show position-fixed bottom-0 end-0 m-4 shadow-lg border-0 rounded-3 z-3`;
+            toast.style.minWidth = '320px';
+            toast.innerHTML = `<div>${msg}</div><button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            document.body.appendChild(toast);
+            setTimeout(() => { if (toast.parentNode) toast.remove(); }, 5000);
         }
     </script>
 }
