@@ -1,0 +1,72 @@
+@model ChatWorkspaceViewModel
+
+<!-- ── DIRECT UPLOAD SOURCE MODAL (NotebookLM Style) ─────────────────────────────────── -->
+<div class="modal fade" id="uploadSourceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border border-slate-700 bg-slate-900 text-white rounded-4 shadow-2xl">
+            <div class="modal-header border-bottom border-slate-800 py-3 px-4">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="p-2 rounded-3 bg-emerald-500-subtle text-emerald-400 border border-emerald-500-border">
+                        <i class="bi bi-cloud-arrow-up fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="modal-title fw-bold text-white mb-0">Thêm nguồn tài liệu mới</h6>
+                        <span class="fs-8 text-slate-400">Môn học: <strong class="text-primary-accent">@Model.CurrentSubjectCode - @Model.CurrentSubjectName</strong></span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <form id="uploadSourceForm" onsubmit="submitSourceUpload(event)">
+                <input type="hidden" name="SubjectId" value="@Model.CurrentSubjectId" />
+                <div class="modal-body p-4">
+                    <!-- File Upload Input Area -->
+                    <div class="mb-3">
+                        <label class="form-label fs-7 fw-semibold text-slate-300">Tệp tài liệu <span class="text-danger">*</span></label>
+                        <div class="upload-dropzone p-4 rounded-3 border-2 border-dashed border-slate-700 text-center cursor-pointer bg-slate-950/50 hover-border-primary transition"
+                             onclick="document.getElementById('sourceFileInput').click()">
+                            <i class="bi bi-file-earmark-arrow-up fs-1 text-emerald-400 mb-2 d-block"></i>
+                            <div class="fs-7 fw-semibold text-slate-200" id="sourceFileNameDisplay">Nhấp để chọn hoặc kéo thả tệp tài liệu vào đây</div>
+                            <div class="fs-8 text-slate-500 mt-1">Hỗ trợ: PDF (.pdf), Word (.docx), PowerPoint (.pptx)</div>
+                            <input type="file" id="sourceFileInput" name="File" class="d-none" accept=".pdf,.docx,.pptx" required onchange="handleSourceFileSelect(this)" />
+                        </div>
+                    </div>
+
+                    <!-- Document Title -->
+                    <div class="mb-3">
+                        <label class="form-label fs-7 fw-semibold text-slate-300">Tiêu đề tài liệu</label>
+                        <input type="text" id="sourceTitleInput" name="Title" class="form-control bg-slate-950 border-slate-700 text-white fs-7 rounded-3" 
+                               placeholder="Để trống để sử dụng tên tệp gốc..." />
+                    </div>
+
+                    <!-- Chapter Selection -->
+                    <div class="mb-3">
+                        <label class="form-label fs-7 fw-semibold text-slate-300">Chương mục bài giảng</label>
+                        <select id="sourceChapterSelect" name="ChapterId" class="form-select bg-slate-950 border-slate-700 text-white fs-7 rounded-3">
+                            <option value="">-- Toàn bộ môn học (Chung) --</option>
+                        </select>
+                    </div>
+
+                    <!-- Live SignalR Progress Indicator (Hidden until upload starts) -->
+                    <div id="sourceUploadProgressWrapper" class="d-none mt-4 p-3 rounded-3 bg-slate-950 border border-slate-800">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fs-8 fw-semibold text-slate-300" id="sourceUploadStatusText">1/4: Đang đọc tệp và tính toán SHA-256...</span>
+                            <span class="fs-8 fw-bold text-emerald-400" id="sourceUploadPercentText">0%</span>
+                        </div>
+                        <div class="progress bg-slate-800" style="height: 8px;">
+                            <div id="sourceUploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-emerald-500" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-top border-slate-800 py-3 px-4 d-flex justify-content-between">
+                    <button type="button" class="btn btn-sm btn-dark-glass rounded-pill px-3" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" id="btnSubmitSourceUpload" class="btn btn-sm btn-emerald text-white rounded-pill px-4 fw-semibold d-flex align-items-center gap-2">
+                        <i class="bi bi-upload"></i> Bắt đầu xử lý &amp; Phân mảnh
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
