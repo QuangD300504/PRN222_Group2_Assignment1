@@ -1,0 +1,58 @@
+@page
+@model PRN222_Group2_Assignment2.Pages.Chat.IndexModel
+@{
+    ViewData["Title"] = "AI Chat & Q&A Workspace";
+    var userName = HttpContext.Session.GetString("UserName") ?? "Bạn";
+    ViewData["UserName"] = userName;
+    var currentSub = Model.Workspace.CurrentSubjectCode;
+}
+
+<link rel="stylesheet" href="~/css/chat.css" asp-append-version="true" />
+
+<div class="chat-workspace-container">
+    <!-- 1. LEFT SIDEBAR: SOURCES (Collapsible NotebookLM Style with Slim Rail) -->
+    <partial name="_LeftSourcesSidebar" model="Model.Workspace" />
+
+    <!-- 2. CENTER CONVERSATION CANVAS -->
+    <partial name="_ChatMainCanvas" model="Model.Workspace" view-data="ViewData" />
+
+    <!-- 3. RIGHT SIDEBAR: CHAT HISTORY (Collapsible NotebookLM Style with Slim Rail) -->
+    <partial name="_RightHistorySidebar" model="Model.Workspace" />
+</div>
+
+<!-- 4. CITATION POPOVER MODAL ("Xem nguồn" Grounding Inspector) -->
+<partial name="_CitationModal" />
+
+<!-- 5. DIRECT UPLOAD SOURCE MODAL (NotebookLM Style) -->
+<partial name="_UploadSourceModal" model="Model.Workspace" />
+
+<!-- Toast Container for SignalR Live Notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+    <div id="chatSignalRToast" class="toast align-items-center text-white bg-slate-900 border border-slate-700 shadow-xl rounded-3" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fs-7 d-flex align-items-center gap-2" id="chatSignalRToastBody">
+                <i class="bi bi-check-circle-fill text-emerald-400 fs-5"></i>
+                <span id="chatSignalRToastText">Thông báo SignalR</span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- SignalR Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+
+    <!-- Runtime Chat Config Bridge -->
+    <script>
+        window.ChatConfig = {
+            activeSubjectId: @Model.Workspace.CurrentSubjectId,
+            activeSessionId: @(Model.Workspace.ActiveSession?.Id ?? 0),
+            currentUserName: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(userName)),
+            currentSubjectCode: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(currentSub ?? ""))
+        };
+    </script>
+
+    <!-- External Chat Workspace Client Script -->
+    <script src="~/js/chat.js" asp-append-version="true"></script>
+}

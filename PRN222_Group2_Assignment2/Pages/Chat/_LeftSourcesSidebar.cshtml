@@ -1,0 +1,124 @@
+@model ChatWorkspaceViewModel
+@{
+    var totalSources = Model.SourceDocuments.Count;
+}
+
+<!-- ── LEFT SIDEBAR: SOURCES (Collapsible NotebookLM Style with Slim Rail) ──────── -->
+<aside class="chat-sidebar left-sidebar" id="leftSidebar">
+    <!-- Expanded Full View -->
+    <div class="sidebar-expanded-view flex-column h-100">
+        <!-- Subject Selector & New Chat -->
+        <div class="sidebar-header p-3 border-bottom border-slate-800 d-flex flex-column gap-2-5">
+            <div class="d-flex align-items-center justify-content-between gap-2">
+                <div class="dropdown flex-grow-1 position-relative">
+                    <button class="btn btn-sm btn-dark-glass w-100 d-flex align-items-center justify-content-between text-start rounded-3 px-3 py-2 border border-slate-700 shadow-sm" 
+                            type="button" id="subjectDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                        <div class="d-flex align-items-center gap-2 overflow-hidden">
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-8 flex-shrink-0">@Model.CurrentSubjectCode</span>
+                            <span class="fw-semibold text-white fs-7 text-truncate">@Model.CurrentSubjectName</span>
+                        </div>
+                        <i class="bi bi-chevron-down text-slate-400 fs-8 ms-1 flex-shrink-0"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark subject-dropdown-menu shadow-2xl w-100 mt-1" aria-labelledby="subjectDropdownBtn">
+                        @foreach (var sub in Model.AvailableSubjects)
+                        {
+                            var isSubActive = sub.Id == Model.CurrentSubjectId;
+                            <li>
+                                <a class="dropdown-item subject-menu-item d-flex align-items-center justify-content-between @(isSubActive ? "active" : "")" 
+                                   asp-page="/Chat/Index" asp-route-subjectId="@sub.Id">
+                                    <div class="text-truncate me-2">
+                                        <strong class="@(isSubActive ? "text-primary-accent" : "text-white")">@sub.Code</strong>
+                                        <span class="text-slate-400 fs-8 d-block text-truncate">@sub.Name</span>
+                                    </div>
+                                    <span class="badge bg-slate-800 text-slate-400 fs-8 flex-shrink-0">@sub.DocumentCount docs</span>
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+
+                <!-- Left Sidebar Collapse Toggle Button -->
+                <button type="button" class="btn btn-icon btn-sm text-slate-400 hover-text-white p-1-5 rounded-2 border border-slate-800 flex-shrink-0" 
+                        onclick="toggleLeftSidebar()" title="Thu gọn danh sách nguồn">
+                    <i class="bi bi-layout-sidebar-inset fs-6"></i>
+                </button>
+            </div>
+
+            <button type="button" class="btn btn-primary btn-sm w-100 rounded-pill py-2 d-flex align-items-center justify-content-center gap-2 fw-semibold shadow-sm" onclick="startNewChatSeamless()">
+                <i class="bi bi-plus-circle-fill"></i> Cuộc trò chuyện mới
+            </button>
+        </div>
+
+        <div class="sidebar-scrollable-content custom-scrollbar p-3">
+            <!-- Source Documents (Nguồn tài liệu) -->
+            <div class="sources-section">
+                <!-- Add Source Button (Direct Upload inside Chat) -->
+                <button type="button" class="btn btn-outline-emerald btn-sm w-100 rounded-3 py-2 d-flex align-items-center justify-content-center gap-2 fw-semibold fs-8 mb-3 shadow-sm" 
+                        onclick="openUploadSourceModal()">
+                    <i class="bi bi-cloud-arrow-up-fill fs-6"></i> Thêm nguồn tài liệu
+                </button>
+
+                <div class="d-flex align-items-center justify-content-between mb-2-5 pt-1">
+                    <span class="fs-8 text-uppercase tracking-wider fw-bold text-slate-400">
+                        <i class="bi bi-folder2-open text-emerald-400 me-1"></i> Nguồn (<span id="selectedCountDisplay">@totalSources</span>/<span id="totalSourcesDisplay">@totalSources</span>)
+                    </span>
+                    <label class="form-check-label fs-8 text-slate-400 cursor-pointer d-flex align-items-center gap-1">
+                        <input type="checkbox" id="selectAllSources" class="form-check-input form-check-input-sm" checked />
+                        Tất cả
+                    </label>
+                </div>
+
+                <div class="sources-list d-flex flex-column gap-2" id="sourcesList">
+                    @if (Model.SourceDocuments.Count == 0)
+                    {
+                        <div class="text-slate-500 fs-8 text-center py-4" id="noSourcesNotice">
+                            <i class="bi bi-file-earmark-x fs-4 d-block mb-2 text-slate-600"></i>
+                            Chưa có tài liệu nào sẵn sàng.
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var doc in Model.SourceDocuments)
+                        {
+                            <label id="sourceDocItem-@doc.Id" class="source-item d-flex align-items-start gap-2 p-2 rounded-2 border border-slate-800/60 bg-slate-900/40 cursor-pointer transition">
+                                <input type="checkbox" class="source-checkbox form-check-input mt-1" value="@doc.Id" checked data-title="@doc.Title" />
+                                <div class="flex-grow-1 overflow-hidden">
+                                    <div class="d-flex align-items-center gap-1 text-truncate">
+                                        <span class="badge @(doc.FileExtension == ".pdf" ? "bg-danger-subtle text-danger" : doc.FileExtension == ".docx" ? "bg-primary-subtle text-primary" : "bg-warning-subtle text-warning") fs-9">
+                                            @doc.FileExtension.ToUpper().Replace(".", "")
+                                        </span>
+                                        <span class="fs-8 text-slate-200 fw-medium text-truncate" title="@doc.Title">@doc.Title</span>
+                                    </div>
+                                    <div class="fs-9 text-slate-500 mt-0-5 d-flex gap-2">
+                                        <span><i class="bi bi-grid-3x3-gap"></i> @doc.ChunkCount chunks</span>
+                                        <span class="text-truncate" style="max-width: 110px;">@doc.ChapterTitle</span>
+                                    </div>
+                                </div>
+                            </label>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slim Rail View (When collapsed like NotebookLM) -->
+    <div class="sidebar-slim-view flex-column align-items-center h-100 py-3 gap-2-5">
+        <button type="button" class="btn btn-icon btn-sm text-slate-400 hover-text-white p-2 rounded-2 border border-slate-800" 
+                onclick="toggleLeftSidebar()" title="Mở rộng nguồn tài liệu">
+            <i class="bi bi-layout-sidebar-inset fs-5"></i>
+        </button>
+        <button type="button" class="btn btn-icon btn-sm text-emerald-400 hover-text-white p-2 rounded-2 bg-emerald-500-subtle border border-emerald-500-border" 
+                onclick="openUploadSourceModal()" title="Thêm nguồn tài liệu">
+            <i class="bi bi-plus-lg fs-5"></i>
+        </button>
+        <div class="slim-icons-list custom-scrollbar d-flex flex-column align-items-center gap-2 w-100 overflow-y-auto px-1" id="slimSourcesList">
+            @foreach (var doc in Model.SourceDocuments)
+            {
+                <button type="button" class="btn btn-icon btn-sm text-primary p-2 rounded-2 hover-bg-slate-800" title="@doc.Title (@doc.ChunkCount chunks)">
+                    <i class="bi bi-file-earmark-text fs-5"></i>
+                </button>
+            }
+        </div>
+    </div>
+</aside>

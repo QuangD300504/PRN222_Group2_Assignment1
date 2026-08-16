@@ -1,0 +1,68 @@
+@model ChatWorkspaceViewModel
+
+<!-- ── RIGHT SIDEBAR: CHAT HISTORY (Collapsible NotebookLM Style with Slim Rail) ─── -->
+<aside class="chat-sidebar right-sidebar" id="rightSidebar">
+    <!-- Expanded Full View -->
+    <div class="sidebar-expanded-view flex-column h-100">
+        <div class="sidebar-header p-3 border-bottom border-slate-800 d-flex align-items-center justify-content-between">
+            <span class="fs-8 text-uppercase tracking-wider fw-bold text-slate-300 d-flex align-items-center gap-1-5">
+                <i class="bi bi-clock-history text-primary-accent"></i> Lịch sử hội thoại
+            </span>
+            <button type="button" class="btn btn-icon btn-sm text-slate-400 hover-text-white p-1-5 rounded-2 border border-slate-800 flex-shrink-0" 
+                    onclick="toggleRightSidebar()" title="Thu gọn lịch sử">
+                <i class="bi bi-layout-sidebar-inset-reverse fs-6"></i>
+            </button>
+        </div>
+
+        <!-- Scrollable Session List (Independent Scrollbar) -->
+        <div class="sidebar-scrollable-content custom-scrollbar p-3">
+            <div class="sessions-list d-flex flex-column gap-1" id="sessionsList">
+                @if (Model.RecentSessions.Count == 0)
+                {
+                    <div class="text-slate-500 fs-8 text-center py-4" id="noSessionsNotice">
+                        <i class="bi bi-chat-square-text fs-4 d-block mb-2 text-slate-600"></i>
+                        Chưa có cuộc trò chuyện nào.
+                    </div>
+                }
+                else
+                {
+                    @foreach (var session in Model.RecentSessions)
+                    {
+                        var isActive = Model.ActiveSession?.Id == session.Id;
+                        <div id="sessionItem-@session.Id" class="session-item d-flex align-items-center justify-content-between p-2 rounded-2 @(isActive ? "active-session" : "hover-session") transition">
+                            <button type="button" class="btn btn-link text-decoration-none d-flex align-items-center gap-2 flex-grow-1 overflow-hidden p-0 text-start border-0 bg-transparent"
+                                    onclick="loadSessionSeamless(@session.Id, '@Html.Raw(Html.Encode(session.Title))', this)">
+                                <i class="bi @(isActive ? "bi-chat-dots-fill text-primary" : "bi-chat-left text-slate-500") fs-8 session-icon"></i>
+                                <span class="fs-8 @(isActive ? "text-white fw-semibold" : "text-slate-300") text-truncate session-title-text" title="@session.Title">
+                                    @session.Title
+                                </span>
+                            </button>
+                            <button type="button" class="btn btn-icon btn-sm text-slate-500 hover-text-danger p-0 border-0 bg-transparent ms-1 flex-shrink-0"
+                                    onclick="deleteSessionSeamless(@session.Id, event, this)" title="Xóa cuộc trò chuyện">
+                                <i class="bi bi-trash fs-8"></i>
+                            </button>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Slim Rail View (When collapsed like NotebookLM) -->
+    <div class="sidebar-slim-view flex-column align-items-center h-100 py-3 gap-2-5">
+        <button type="button" class="btn btn-icon btn-sm text-slate-400 hover-text-white p-2 rounded-2 border border-slate-800" 
+                onclick="toggleRightSidebar()" title="Mở rộng lịch sử">
+            <i class="bi bi-layout-sidebar-inset-reverse fs-5"></i>
+        </button>
+        <div class="slim-icons-list custom-scrollbar d-flex flex-column align-items-center gap-2 w-100 overflow-y-auto px-1" id="slimSessionsList">
+            @foreach (var session in Model.RecentSessions)
+            {
+                var isActive = Model.ActiveSession?.Id == session.Id;
+                <button type="button" id="slimSessionItem-@session.Id" class="btn btn-icon btn-sm @(isActive ? "text-primary active-slim-item" : "text-slate-400") hover-text-white p-2 rounded-2 hover-bg-slate-800" 
+                        onclick="loadSessionSeamless(@session.Id, '@Html.Raw(Html.Encode(session.Title))', this)" title="@session.Title">
+                    <i class="bi @(isActive ? "bi-chat-dots-fill" : "bi-chat-left-text") fs-5"></i>
+                </button>
+            }
+        </div>
+    </div>
+</aside>
