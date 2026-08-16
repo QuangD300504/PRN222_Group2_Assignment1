@@ -34,12 +34,11 @@
     </div>
 
     <!-- Concurrent Editing Live Banner (SignalR) -->
-    <div id="concurrentEditBanner" class="d-none alert alert-warning border-0 rounded-3 py-2 px-3 mb-3 d-flex align-items-center justify-content-between shadow-sm">
+    <div id="concurrentEditBanner" class="d-none alert alert-warning border-0 rounded-3 py-2 px-3 mb-3 d-flex align-items-center shadow-sm">
         <div class="d-flex align-items-center gap-2 fs-7">
             <span class="spinner-grow spinner-grow-sm text-warning" role="status"></span>
             <span id="concurrentEditMessage" class="text-warning-emphasis"></span>
         </div>
-        <span class="badge bg-warning-subtle text-warning border border-warning-subtle fs-8"><i class="bi bi-broadcast"></i> Live Sync</span>
     </div>
 
     <!-- Subject Selection Pills & Create Subject Bar -->
@@ -702,14 +701,20 @@
 
         // Helper to refresh table without full page reload
         function refreshCurrentSubjectTable(evtSubjectId) {
-            const activeSubBtn = document.querySelector('.btn-primary[data-subject-id]');
-            const currentSubId = activeSubBtn ? activeSubBtn.getAttribute('data-subject-id') : null;
+            const currentSubId = (typeof _activeSubjectId !== 'undefined') ? _activeSubjectId : 0;
             if (!evtSubjectId || evtSubjectId == currentSubId) {
-                const searchInput = document.getElementById('searchQueryInput');
-                const typeFilter = document.getElementById('fileTypeFilter');
-                const searchVal = searchInput ? searchInput.value : '';
-                const typeVal = typeFilter ? typeFilter.value : '';
-                fetchDocumentsPartial(currentSubId, null, searchVal, typeVal);
+                if (typeof applyFilters === 'function') {
+                    applyFilters();
+                } else {
+                    const region = document.getElementById('doc-partial-region');
+                    if (region) {
+                        region.style.opacity = '0.4';
+                        fetch(`?handler=DocumentsPartial&subjectId=${currentSubId}`)
+                            .then(r => r.text())
+                            .then(html => { region.innerHTML = html; region.style.opacity = '1'; })
+                            .catch(() => { region.style.opacity = '1'; });
+                    }
+                }
             }
         }
 
