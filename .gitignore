@@ -42,6 +42,8 @@ bld/
 # Uploaded documents
 PRN222_Group2_Assignment1/wwwroot/uploads/*
 !PRN222_Group2_Assignment1/wwwroot/uploads/.gitkeep
+PRN222_Group2_Assignment2/wwwroot/uploads/*
+!PRN222_Group2_Assignment2/wwwroot/uploads/.gitkeep
 
 # Visual Studio 2017 auto generated files
 Generated\ Files/
