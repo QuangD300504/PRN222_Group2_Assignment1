@@ -1,3 +1,6 @@
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using PRN222_Group2_Assignment1.Data;
 using PRN222_Group2_Assignment1.Models;
@@ -5,7 +8,7 @@ using PRN222_Group2_Assignment1.ViewModels;
 
 namespace PRN222_Group2_Assignment1.Services;
 
-public class DocumentService(AppDbContext context, IWebHostEnvironment env) : IDocumentService
+public class DocumentService(AppDbContext context, IWebHostEnvironment env, IHttpClientFactory httpClientFactory) : IDocumentService
 {
     private static readonly HashSet<string> AllowedExtensions = ["pdf", "docx", "pptx"];
     private const long MaxFileSizeBytes = 25 * 1024 * 1024; // 25 MB
@@ -215,6 +218,11 @@ public class DocumentService(AppDbContext context, IWebHostEnvironment env) : ID
                 document.ChunkCount = chunks.Count;
                 document.Status = "Ready";
                 document.IndexedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync();
+
+                // Generate embeddings via Ollama (graceful fallback if offline)
+                await GenerateEmbeddingsForChunksAsync(chunks);
+                await context.SaveChangesAsync();
             }
             else
             {
@@ -373,5 +381,44 @@ public class DocumentService(AppDbContext context, IWebHostEnvironment env) : ID
     {
         var invalid = Path.GetInvalidFileNameChars();
         return string.Concat(Path.GetFileName(fileName).Select(c => invalid.Contains(c) ? '_' : c));
+    }
+
+    private async Task GenerateEmbeddingsForChunksAsync(List<DocumentChunk> chunks)
+    {
+        var client = httpClientFactory.CreateClient("Ollama");
+        foreach (var chunk in chunks)
+        {
+            try
+            {
+                var textToEmbed = string.IsNullOrWhiteSpace(chunk.Heading)
+                    ? chunk.Content
+                    : $"{chunk.Heading}\n{chunk.Content}";
+
+                var response = await client.PostAsJsonAsync("http://localhost:11434/api/embeddings", new
+                {
+                    model = "nomic-embed-text",
+                    prompt = textToEmbed
+                });
+
+                if (!response.IsSuccessStatusCode) continue;
+
+                var result = await response.Content.ReadFromJsonAsync<OllamaEmbeddingResponse>();
+                if (result?.Embedding is { Length: > 0 })
+                {
+                    chunk.EmbeddingVectorJson = JsonSerializer.Serialize(result.Embedding);
+                    chunk.HasEmbedding = true;
+                }
+            }
+            catch
+            {
+                // ponytail: silent fallback — chunk stays with HasEmbedding=false, lexical scoring used at query time
+            }
+        }
+    }
+
+    private sealed class OllamaEmbeddingResponse
+    {
+        [JsonPropertyName("embedding")]
+        public float[]? Embedding { get; set; }
     }
 }

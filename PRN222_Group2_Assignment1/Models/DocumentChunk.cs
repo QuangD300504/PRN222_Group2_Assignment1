@@ -23,5 +23,7 @@ public class DocumentChunk
 
     public bool HasEmbedding { get; set; }
 
+    public string? EmbeddingVectorJson { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
