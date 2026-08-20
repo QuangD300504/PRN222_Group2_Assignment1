@@ -190,6 +190,35 @@ body:has(.chat-workspace-container) main {
     transform: translateY(-1px);
 }
 
+/* ── NotebookLM Inline Citation Pill ──────────────────────────── */
+.inline-cit-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.18);
+    border: 1px solid rgba(16, 185, 129, 0.45);
+    color: #34d399;
+    font-size: 11px;
+    font-weight: 700;
+    margin: 0 3px;
+    vertical-align: middle;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.inline-cit-pill:hover {
+    background: #10b981;
+    color: #042f2e;
+    border-color: #34d399;
+    transform: scale(1.15) translateY(-1px);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
 /* ── Follow-Up Suggestion Chips (NotebookLM Style) ────────────── */
 .btn-followup-chip {
     display: inline-flex;

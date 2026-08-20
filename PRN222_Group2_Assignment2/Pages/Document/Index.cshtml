@@ -139,8 +139,9 @@
 </div>
 
 @section Scripts {
-    <!-- SignalR Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <!-- SignalR Library (LibMan) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script> 
+    @* <script src="~/lib/microsoft/signalr/dist/browser/signalr.min.js"></script> *@
 
     <!-- Runtime Document Config Bridge -->
     <script>
@@ -154,3 +155,4 @@
     <!-- External Document Management Client Script -->
     <script src="~/js/document.js" asp-append-version="true"></script>
 }
+    

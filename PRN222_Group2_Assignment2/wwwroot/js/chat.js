@@ -147,24 +147,18 @@ function appendNewSourceDocument(doc) {
     const sourcesList = document.getElementById('sourcesList');
     if (!sourcesList) return;
 
-    const badgeClass = doc.fileExtension === '.pdf' ? 'bg-danger-subtle text-danger' : 
-                       doc.fileExtension === '.docx' ? 'bg-primary-subtle text-primary' : 'bg-warning-subtle text-warning';
+    const badgeClass = doc.fileExtension === '.pdf' ? 'bg-danger-subtle text-danger border border-danger-subtle' : 
+                       doc.fileExtension === '.docx' ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-warning-subtle text-warning border border-warning-subtle';
     const extName = (doc.fileExtension || '').toUpperCase().replace('.', '');
 
     const label = document.createElement('label');
     label.id = `sourceDocItem-${doc.id}`;
-    label.className = 'source-item d-flex align-items-start gap-2 p-2 rounded-2 border border-slate-800/60 bg-slate-900/40 cursor-pointer transition';
+    label.className = 'source-item d-flex align-items-center gap-2 px-2-5 py-2 rounded-3 border border-slate-800 bg-slate-900/50 hover-bg-slate-850 cursor-pointer transition';
     label.innerHTML = `
-        <input type="checkbox" class="source-checkbox form-check-input mt-1" value="${doc.id}" checked data-title="${escapeHtml(doc.title)}" />
-        <div class="flex-grow-1 overflow-hidden">
-            <div class="d-flex align-items-center gap-1 text-truncate">
-                <span class="badge ${badgeClass} fs-9">${extName}</span>
-                <span class="fs-8 text-slate-200 fw-medium text-truncate" title="${escapeHtml(doc.title)}">${escapeHtml(doc.title)}</span>
-            </div>
-            <div class="fs-9 text-slate-500 mt-0-5 d-flex gap-2">
-                <span><i class="bi bi-grid-3x3-gap"></i> ${doc.chunkCount} chunks</span>
-                <span class="text-truncate" style="max-width: 110px;">${escapeHtml(doc.chapterTitle || 'Chung')}</span>
-            </div>
+        <input type="checkbox" class="source-checkbox form-check-input flex-shrink-0 m-0" value="${doc.id}" checked data-title="${escapeHtml(doc.title)}" />
+        <div class="d-flex align-items-center gap-1-5 overflow-hidden flex-grow-1" style="min-width: 0;">
+            <span class="badge ${badgeClass} fs-9 flex-shrink-0">${extName}</span>
+            <span class="fs-8 text-slate-200 fw-medium text-truncate" title="${escapeHtml(doc.title)}">${escapeHtml(doc.title)}</span>
         </div>
     `;
 
@@ -314,18 +308,49 @@ function handleCitationChipClick(btn) {
     const snippet = btn.dataset.citSnippet || '';
     const score = btn.dataset.citScore || '0.90';
 
+    populateAndShowCitationModal(index, title, page, heading, snippet, score);
+}
+
+// NotebookLM-Style Interactive Inline Citation Click Handler
+function openInlineCitation(btn, index) {
+    const bubble = btn.closest('.assistant-bubble');
+    if (!bubble) return;
+    
+    try {
+        const citationsJson = bubble.getAttribute('data-citations');
+        if (citationsJson) {
+            const citations = JSON.parse(citationsJson);
+            const found = citations.find(c => c.index === parseInt(index, 10));
+            if (found) {
+                populateAndShowCitationModal(
+                    found.index, 
+                    found.documentTitle || 'Tài liệu trích dẫn', 
+                    found.pageNumber || 1, 
+                    found.heading || 'Chung', 
+                    found.snippet || '', 
+                    found.similarityScore || 0.9
+                );
+                return;
+            }
+        }
+    } catch (e) {
+        console.warn('Error reading inline citation data:', e);
+    }
+}
+
+function populateAndShowCitationModal(index, title, page, heading, snippet, score) {
     document.getElementById('modalCitIndexBadge').innerText = index;
     document.getElementById('modalCitDocTitle').innerText = title;
     document.getElementById('modalCitPage').innerText = page;
     document.getElementById('modalCitHeading').innerText = heading || 'Chung';
     document.getElementById('modalCitSnippet').innerText = snippet;
-    document.getElementById('modalCitScore').innerText = score;
+    document.getElementById('modalCitScore').innerText = typeof score === 'number' ? score.toFixed(2) : score;
     
     const modal = new bootstrap.Modal(document.getElementById('citationModal'));
     modal.show();
 }
 
-// Lightweight Client-Side Markdown Formatter
+// Lightweight Client-Side Markdown Formatter with NotebookLM Inline Citations
 function formatMarkdown(text) {
     if (!text) return '';
     let html = escapeHtml(text);
@@ -346,7 +371,10 @@ function formatMarkdown(text) {
     html = html.replace(/^### (.*$)/gim, '<h6 class="fw-bold text-white mt-2 mb-1">$1</h6>');
     html = html.replace(/^## (.*$)/gim, '<h5 class="fw-bold text-white mt-2 mb-1">$1</h5>');
 
-    // 5. Linebreaks
+    // 5. NotebookLM Interactive Inline Citations [1], [2], [3]
+    html = html.replace(/\[(\d+)\]/g, '<button type="button" class="inline-cit-pill" onclick="openInlineCitation(this, $1)" title="Xem nguồn trích dẫn $1">$1</button>');
+
+    // 6. Linebreaks
     html = html.replace(/\n/g, '<br/>');
 
     return html;
@@ -516,29 +544,6 @@ function renderSessionMessages(messages) {
             const aiRow = document.createElement('div');
             aiRow.className = 'message-row assistant-row d-flex justify-content-start mb-4';
 
-            let citationsHtml = '';
-            if (msg.citations && msg.citations.length > 0) {
-                citationsHtml = `
-                    <div class="citations-bar mt-3 pt-2 border-top border-slate-800 d-flex flex-wrap align-items-center gap-1-5">
-                        <span class="fs-8 text-slate-400 fw-semibold me-1"><i class="bi bi-bookmarks text-emerald-400"></i> Nguồn trích dẫn:</span>
-                        ${msg.citations.map(c => `
-                            <button type="button" class="btn-citation-chip" 
-                                    data-cit-index="${c.index}"
-                                    data-cit-title="${escapeHtml(c.documentTitle)}"
-                                    data-cit-page="${c.pageNumber}"
-                                    data-cit-heading="${escapeHtml(c.heading || '')}"
-                                    data-cit-snippet="${escapeHtml(c.snippet)}"
-                                    data-cit-score="${c.similarityScore}"
-                                    onclick="handleCitationChipClick(this)">
-                                <span class="citation-circle">${c.index}</span>
-                                <span class="text-truncate" style="max-width: 140px;">${escapeHtml(c.documentTitle)}</span>
-                                <span class="text-slate-400">· P.${c.pageNumber}</span>
-                            </button>
-                        `).join('')}
-                    </div>
-                `;
-            }
-
             let followupsHtml = '';
             if (msg.suggestedFollowUps && msg.suggestedFollowUps.length > 0) {
                 followupsHtml = `
@@ -555,15 +560,17 @@ function renderSessionMessages(messages) {
                 `;
             }
 
+            const citationsJson = msg.citations ? JSON.stringify(msg.citations) : '[]';
+
             aiRow.innerHTML = `
                 <div class="assistant-avatar rounded-circle d-flex align-items-center justify-content-center me-2 flex-shrink-0">
                     <i class="bi bi-robot text-primary-accent fs-6"></i>
                 </div>
-                <div class="message-bubble assistant-bubble rounded-4 p-3-5 max-w-2xl border border-slate-800 bg-slate-900/80 shadow-sm">
+                <div class="message-bubble assistant-bubble rounded-4 p-3-5 max-w-2xl border border-slate-800 bg-slate-900/80 shadow-sm"
+                     data-citations='${escapeHtml(citationsJson)}'>
                     <div class="markdown-body fs-7 text-slate-200">
                         ${formatMarkdown(msg.content)}
                     </div>
-                    ${citationsHtml}
                     ${followupsHtml}
                 </div>
             `;
@@ -680,41 +687,99 @@ async function submitChatQuestion() {
     `;
     messagesContainer.appendChild(userRow);
 
-    const loadingRow = document.createElement('div');
-    loadingRow.className = 'message-row assistant-row d-flex justify-content-start mb-4';
-    loadingRow.id = 'assistantThinkingRow';
-    loadingRow.innerHTML = `
+    const aiRow = document.createElement('div');
+    aiRow.className = 'message-row assistant-row d-flex justify-content-start mb-4';
+    aiRow.innerHTML = `
         <div class="assistant-avatar rounded-circle d-flex align-items-center justify-content-center me-2 flex-shrink-0">
             <i class="bi bi-robot text-primary-accent fs-6"></i>
         </div>
-        <div class="message-bubble assistant-bubble rounded-4 p-3-5 max-w-2xl border border-slate-800 bg-slate-900/80 shadow-sm">
-            <div class="d-flex align-items-center gap-2 text-slate-400 fs-7">
+        <div class="message-bubble assistant-bubble rounded-4 p-3-5 max-w-2xl border border-slate-800 bg-slate-900/80 shadow-sm" id="activeStreamingBubble">
+            <div class="d-flex align-items-center gap-2 text-slate-400 fs-7" id="streamingSpinnerIndicator">
                 <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                <span>Đang tìm kiếm vector và trích xuất nguồn trích dẫn...</span>
+                <span>Đang trích xuất tri thức & tổng hợp câu trả lời...</span>
             </div>
+            <div class="markdown-body fs-7 text-slate-200 d-none" id="streamingTextContent"></div>
         </div>
     `;
-    messagesContainer.appendChild(loadingRow);
+    messagesContainer.appendChild(aiRow);
     smoothScrollToBottom();
 
     input.value = '';
     autoResize(input);
     document.getElementById('btnSendChat').disabled = true;
 
+    const payload = {
+        sessionId: _activeSessionId > 0 ? _activeSessionId : null,
+        subjectId: _activeSubjectId,
+        message: query,
+        selectedDocumentIds: selectedDocIds
+    };
+
+    let accumulatedRawText = "";
+    const bubble = aiRow.querySelector('#activeStreamingBubble');
+    const spinner = aiRow.querySelector('#streamingSpinnerIndicator');
+    const textContainer = aiRow.querySelector('#streamingTextContent');
+
+    // Attempt real-time SignalR token streaming (Option B)
+    if (_signalrConnection && _signalrConnection.state === signalR.HubConnectionState.Connected) {
+        try {
+            _signalrConnection.stream("StreamChatMessage", payload).subscribe({
+                next: (packet) => {
+                    if (packet.type === 'init') {
+                        const prevSessionId = _activeSessionId;
+                        _activeSessionId = packet.sessionId;
+                        document.getElementById('chatHeaderTitle').innerText = packet.sessionTitle || "Cuộc trò chuyện";
+                        window.history.pushState({}, '', `?subjectId=${_activeSubjectId}&sessionId=${packet.sessionId}`);
+
+                        if (isNewSession || prevSessionId === 0) {
+                            prependSessionToSidebar(packet.sessionId, packet.sessionTitle);
+                        }
+                    } else if (packet.type === 'token') {
+                        if (spinner) spinner.classList.add('d-none');
+                        if (textContainer) {
+                            textContainer.classList.remove('d-none');
+                            accumulatedRawText += packet.token;
+                            textContainer.innerHTML = formatMarkdown(accumulatedRawText) + '<span class="streaming-cursor animate-pulse">▋</span>';
+                            smoothScrollToBottom();
+                        }
+                    } else if (packet.type === 'done') {
+                        if (bubble && packet.assistantMessage) {
+                            const citationsJson = packet.assistantMessage.citations ? JSON.stringify(packet.assistantMessage.citations) : '[]';
+                            bubble.setAttribute('data-citations', citationsJson);
+                            if (textContainer) {
+                                textContainer.innerHTML = formatMarkdown(packet.assistantMessage.content || accumulatedRawText);
+                            }
+                        }
+                    }
+                },
+                complete: () => {
+                    document.getElementById('btnSendChat').disabled = false;
+                    smoothScrollToBottom();
+                },
+                error: (err) => {
+                    console.warn("SignalR stream error, falling back to standard AJAX:", err);
+                    fallbackAjaxChat(payload, aiRow, query, isNewSession);
+                }
+            });
+            return;
+        } catch (e) {
+            console.warn("Could not initiate SignalR stream:", e);
+        }
+    }
+
+    // Fallback: Standard AJAX Request
+    await fallbackAjaxChat(payload, aiRow, query, isNewSession);
+}
+
+async function fallbackAjaxChat(payload, aiRow, query, isNewSession) {
+    const bubble = aiRow.querySelector('.assistant-bubble');
     try {
         const res = await fetch('?handler=SendMessage', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sessionId: _activeSessionId > 0 ? _activeSessionId : null,
-                subjectId: _activeSubjectId,
-                message: query,
-                selectedDocumentIds: selectedDocIds
-            })
+            body: JSON.stringify(payload)
         });
-
         const data = await res.json();
-        loadingRow.remove();
         document.getElementById('btnSendChat').disabled = false;
 
         if (data.success && data.assistantMessage) {
@@ -727,70 +792,22 @@ async function submitChatQuestion() {
                 prependSessionToSidebar(data.sessionId, data.sessionTitle);
             }
 
-            const aiRow = document.createElement('div');
-            aiRow.className = 'message-row assistant-row d-flex justify-content-start mb-4';
-            
-            let citationsHtml = '';
-            if (data.assistantMessage.citations && data.assistantMessage.citations.length > 0) {
-                citationsHtml = `
-                    <div class="citations-bar mt-3 pt-2 border-top border-slate-800 d-flex flex-wrap align-items-center gap-1-5">
-                        <span class="fs-8 text-slate-400 fw-semibold me-1"><i class="bi bi-bookmarks text-emerald-400"></i> Nguồn trích dẫn:</span>
-                        ${data.assistantMessage.citations.map(c => `
-                            <button type="button" class="btn-citation-chip" 
-                                    data-cit-index="${c.index}"
-                                    data-cit-title="${escapeHtml(c.documentTitle)}"
-                                    data-cit-page="${c.pageNumber}"
-                                    data-cit-heading="${escapeHtml(c.heading || '')}"
-                                    data-cit-snippet="${escapeHtml(c.snippet)}"
-                                    data-cit-score="${c.similarityScore}"
-                                    onclick="handleCitationChipClick(this)">
-                                <span class="citation-circle">${c.index}</span>
-                                <span class="text-truncate" style="max-width: 140px;">${escapeHtml(c.documentTitle)}</span>
-                                <span class="text-slate-400">· P.${c.pageNumber}</span>
-                            </button>
-                        `).join('')}
-                    </div>
-                `;
-            }
-
-            let followupsHtml = '';
-            if (data.assistantMessage.suggestedFollowUps && data.assistantMessage.suggestedFollowUps.length > 0) {
-                followupsHtml = `
-                    <div class="followups-bar mt-3 pt-2 border-top border-slate-800/70 d-flex flex-column gap-1-5">
-                        <span class="fs-8 text-slate-400 fw-semibold"><i class="bi bi-lightbulb text-warning me-1"></i> Câu hỏi gợi ý tiếp theo:</span>
-                        <div class="d-flex flex-wrap gap-1-5">
-                            ${data.assistantMessage.suggestedFollowUps.map(q => `
-                                <button type="button" class="btn-followup-chip" onclick="submitFollowUpPrompt(this)" data-prompt="${escapeHtml(q)}">
-                                    <span>${escapeHtml(q)}</span>
-                                </button>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-
-            aiRow.innerHTML = `
-                <div class="assistant-avatar rounded-circle d-flex align-items-center justify-content-center me-2 flex-shrink-0">
-                    <i class="bi bi-robot text-primary-accent fs-6"></i>
-                </div>
-                <div class="message-bubble assistant-bubble rounded-4 p-3-5 max-w-2xl border border-slate-800 bg-slate-900/80 shadow-sm">
-                    <div class="markdown-body fs-7 text-slate-200">
-                        ${formatMarkdown(data.assistantMessage.content)}
-                    </div>
-                    ${citationsHtml}
-                    ${followupsHtml}
+            const citationsJson = data.assistantMessage.citations ? JSON.stringify(data.assistantMessage.citations) : '[]';
+            bubble.setAttribute('data-citations', citationsJson);
+            bubble.innerHTML = `
+                <div class="markdown-body fs-7 text-slate-200">
+                    ${formatMarkdown(data.assistantMessage.content)}
                 </div>
             `;
-
-            messagesContainer.appendChild(aiRow);
             smoothScrollToBottom();
         } else {
             showChatToast(data.message || 'Lỗi khi xử lý câu hỏi.');
+            aiRow.remove();
         }
     } catch (err) {
-        loadingRow.remove();
         document.getElementById('btnSendChat').disabled = false;
         showChatToast('Lỗi kết nối máy chủ khi gửi tin nhắn.');
+        aiRow.remove();
     }
 }
 

@@ -119,27 +119,40 @@ function viewDocumentChunks(docId) {
             return res.json();
         })
         .then(data => {
-            modalSubtitle.innerHTML = `<span class="text-slate-200 fw-semibold">${data.title}</span> • ${data.subjectName} (${data.chapterTitle}) • ${data.chunkCount} Chunks`;
+            modalSubtitle.innerHTML = `<span class="text-slate-200 fw-semibold">${escapeHtml(data.title)}</span> • ${escapeHtml(data.subjectName)} (${escapeHtml(data.chapterTitle)}) • ${data.chunkCount} Chunks`;
 
             if (!data.chunks || data.chunks.length === 0) {
-                modalBody.innerHTML = `
-                    <div class="text-center py-4 text-slate-400">
-                        <i class="bi bi-info-circle fs-3 text-slate-500 mb-2 d-block"></i>
-                        Tài liệu này chưa có chunks nào.
-                    </div>`;
+                modalBody.innerHTML = `<div class="text-center py-4 text-slate-400">Chưa có chunk nào được trích xuất cho tài liệu này.</div>`;
                 return;
             }
 
-            let html = '<div class="d-flex flex-column gap-3">';
-            data.chunks.forEach(chunk => {
+            let html = `<div class="mb-3 d-flex align-items-center justify-content-between bg-slate-850 p-3 rounded-3 border border-slate-800">
+                <div>
+                    <span class="badge bg-primary-subtle text-primary-accent me-2">${escapeHtml(data.fileExtension || '')}</span>
+                    <span class="text-slate-300 fs-7">${escapeHtml(data.fileName || '')} (${data.formattedSize || ''})</span>
+                </div>
+                <span class="status-pill status-pill-ready"><i class="bi bi-check-circle-fill"></i> ${escapeHtml(data.status || 'Ready')}</span>
+            </div>
+            <div class="d-flex flex-column gap-3">`;
+
+            data.chunks.forEach(c => {
+                const chunkNum = (typeof c.chunkIndex === 'number') ? (c.chunkIndex + 1) : 1;
                 html += `
                     <div class="chunk-card p-3 rounded-3 border border-slate-800 bg-slate-850">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-8">Chunk #${chunk.chunkIndex + 1}</span>
-                            <span class="text-slate-400 fs-8">Trang: ${chunk.pageNumber || 'N/A'} • ${chunk.charCount} ký tự</span>
+                        <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom border-slate-800">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-slate-800 text-primary-accent border border-slate-700 fs-8">Chunk #${chunkNum}</span>
+                                <span class="text-slate-400 fs-8"><i class="bi bi-journal-page"></i> Trang ${c.pageNumber || 1}</span>
+                                ${c.heading ? `<span class="badge bg-slate-800 text-slate-300 fs-8">${escapeHtml(c.heading)}</span>` : ''}
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-slate-400 fs-8">${c.tokenCount || 0} Tokens</span>
+                                ${c.hasEmbedding ? `<span class="badge bg-emerald-500-subtle text-emerald-400 fs-8"><i class="bi bi-vector-pen"></i> Embedded</span>` : ''}
+                            </div>
                         </div>
-                        <p class="text-slate-300 fs-7 mb-0 whitespace-pre-wrap">${escapeHtml(chunk.content)}</p>
-                    </div>`;
+                        <div class="chunk-content text-slate-300 fs-7 whitespace-pre-wrap">${escapeHtml(c.content || '')}</div>
+                    </div>
+                `;
             });
             html += '</div>';
             modalBody.innerHTML = html;
