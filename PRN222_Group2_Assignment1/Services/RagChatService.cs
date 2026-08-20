@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -217,25 +218,39 @@ public partial class RagChatService : IRagChatService
                 DocTitle = c.Document.Title,
                 c.PageNumber,
                 c.Heading,
-                c.Content
+                c.Content,
+                c.HasEmbedding,
+                c.EmbeddingVectorJson
             })
             .ToListAsync();
 
         if (candidateChunks.Count == 0) return [];
 
-        // Vector / Lexical BM25 Cosine Scoring
+        // Try to get the query vector from Ollama (nomic-embed-text)
+        float[]? queryVector = await GetQueryEmbeddingAsync(query);
+
         var queryTokens = Tokenize(query);
-        if (queryTokens.Count == 0) return [];
 
         var scored = candidateChunks.Select(chunk =>
         {
-            var chunkTokens = Tokenize(chunk.Content + " " + (chunk.Heading ?? ""));
-            double score = ComputeSimilarity(queryTokens, chunkTokens);
-            return new
+            double score;
+            if (queryVector != null && chunk.HasEmbedding && !string.IsNullOrEmpty(chunk.EmbeddingVectorJson))
             {
-                Chunk = chunk,
-                Score = score
-            };
+                // True cosine similarity on stored vectors
+                try
+                {
+                    var chunkVec = JsonSerializer.Deserialize<float[]>(chunk.EmbeddingVectorJson);
+                    score = chunkVec != null ? CosineSimilarity(queryVector, chunkVec) : 0.0;
+                }
+                catch { score = 0.0; }
+            }
+            else
+            {
+                // ponytail: lexical fallback for chunks without embeddings (Ollama was offline at upload)
+                var chunkTokens = Tokenize(chunk.Content + " " + (chunk.Heading ?? ""));
+                score = queryTokens.Count > 0 ? ComputeLexicalSimilarity(queryTokens, chunkTokens) : 0.0;
+            }
+            return new { Chunk = chunk, Score = score };
         })
         .Where(x => x.Score > 0.05)
         .OrderByDescending(x => x.Score)
@@ -253,7 +268,7 @@ public partial class RagChatService : IRagChatService
                 DocumentTitle = item.Chunk.DocTitle,
                 PageNumber = item.Chunk.PageNumber,
                 Heading = item.Chunk.Heading,
-                Snippet = TruncateSnippet(item.Chunk.Content, 280),
+                Snippet = TruncateSnippet(item.Chunk.Content, 2000),
                 SimilarityScore = Math.Round(item.Score, 3)
             });
         }
@@ -317,25 +332,19 @@ public partial class RagChatService : IRagChatService
         // 2. RAG Retrieval Step
         var citations = await RetrieveRelevantChunksAsync(request.Message, request.SelectedDocumentIds ?? [], topK: 4);
 
-        // 3. Grounding & Response Synthesis (with Local Qwen2.5:7b LLM via Ollama + fallback)
+        // 3. Grounding & Response Synthesis
         string assistantAnswer;
-        List<string> followUps = [];
 
         if (citations.Count == 0)
         {
-            // Strict Anti-Hallucination Guardrail Refusal
             assistantAnswer = "⚠️ **Thông báo từ Hệ thống RAG**:\n\n" +
                               "Tài liệu môn học trong phạm vi được chọn **không chứa thông tin liên quan** đến câu hỏi của bạn.\n\n" +
                               "*Theo nguyên tắc giới hạn phạm vi tài liệu (Strict Grounding), AI không sử dụng kiến thức bên ngoài để phỏng đoán. Vui lòng kiểm tra lại danh sách tài liệu được chọn ở cột bên trái hoặc tham khảo bài giảng chính thức.*";
-            followUps = [
-                "Tóm tắt các tài liệu đang có trong môn học này?",
-                "Những chủ đề nào được đề cập trong bài giảng?",
-                "Hướng dẫn cách chọn tài liệu để hỏi AI?"
-            ];
         }
         else
         {
-            (assistantAnswer, followUps) = await GenerateAnswerWithLlmAsync(request.Message, citations, subjectCode);
+            assistantAnswer = await GenerateAnswerWithLlmAsync(request.Message, citations, subjectCode);
+            (assistantAnswer, citations) = RenumberCitationsInOrderOfAppearance(assistantAnswer, citations);
         }
 
         // 4. Save Assistant Message
@@ -368,7 +377,206 @@ public partial class RagChatService : IRagChatService
                 Role = "assistant",
                 Content = assistantMessage.Content,
                 Citations = citations,
-                SuggestedFollowUps = followUps,
+                SuggestedFollowUps = [],
+                CreatedAt = assistantMessage.CreatedAt
+            }
+        };
+    }
+
+    public async IAsyncEnumerable<ChatStreamPacket> StreamChatQueryAsync(
+        SendChatRequest request, 
+        int userId, 
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Message))
+        {
+            yield return new ChatStreamPacket { Type = "error", Token = "Nội dung câu hỏi không được để trống." };
+            yield break;
+        }
+
+        var subject = await _context.Subjects.FindAsync([request.SubjectId], cancellationToken);
+        var subjectCode = subject?.Code ?? "PRN222";
+
+        ChatSession? session = null;
+        if (request.SessionId.HasValue && request.SessionId.Value > 0)
+        {
+            session = await _context.ChatSessions
+                .Include(s => s.Messages)
+                .FirstOrDefaultAsync(s => s.Id == request.SessionId.Value && s.UserId == userId, cancellationToken);
+        }
+
+        if (session == null)
+        {
+            var initialTitle = request.Message.Length > 36 ? request.Message[..36] + "..." : request.Message;
+            session = new ChatSession
+            {
+                SubjectId = request.SubjectId,
+                UserId = userId,
+                Title = initialTitle,
+                SelectedDocumentIdsJson = request.SelectedDocumentIds != null ? JsonSerializer.Serialize(request.SelectedDocumentIds) : null,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _context.ChatSessions.Add(session);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        else
+        {
+            session.UpdatedAt = DateTime.UtcNow;
+            if (request.SelectedDocumentIds != null)
+            {
+                session.SelectedDocumentIdsJson = JsonSerializer.Serialize(request.SelectedDocumentIds);
+            }
+        }
+
+        // 1. Save User Message
+        var userMessage = new ChatMessage
+        {
+            SessionId = session.Id,
+            Role = "user",
+            Content = request.Message.Trim(),
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.ChatMessages.Add(userMessage);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        var userMessageDto = new ChatMessageDto
+        {
+            Id = userMessage.Id,
+            Role = "user",
+            Content = userMessage.Content,
+            CreatedAt = userMessage.CreatedAt
+        };
+
+        // Emit initialization packet to start client typing UI instantly
+        yield return new ChatStreamPacket
+        {
+            Type = "init",
+            SessionId = session.Id,
+            SessionTitle = session.Title,
+            UserMessage = userMessageDto
+        };
+
+        // 2. Vector Retrieval Step
+        var citations = await RetrieveRelevantChunksAsync(request.Message, request.SelectedDocumentIds ?? [], topK: 4);
+
+        if (citations.Count == 0)
+        {
+            var guardrailText = "⚠️ **Thông báo từ Hệ thống RAG**:\n\nTài liệu môn học trong phạm vi được chọn **không chứa thông tin liên quan** đến câu hỏi của bạn.\n\n*Theo nguyên tắc giới hạn phạm vi tài liệu (Strict Grounding), AI không sử dụng kiến thức bên ngoài để phỏng đoán.*";
+            yield return new ChatStreamPacket { Type = "token", Token = guardrailText, SessionId = session.Id, SessionTitle = session.Title };
+
+            var assistantGuardMessage = new ChatMessage
+            {
+                SessionId = session.Id,
+                Role = "assistant",
+                Content = guardrailText,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.ChatMessages.Add(assistantGuardMessage);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            yield return new ChatStreamPacket
+            {
+                Type = "done",
+                SessionId = session.Id,
+                SessionTitle = session.Title,
+                AssistantMessage = new ChatMessageDto
+                {
+                    Id = assistantGuardMessage.Id,
+                    Role = "assistant",
+                    Content = guardrailText,
+                    CreatedAt = assistantGuardMessage.CreatedAt
+                }
+            };
+            yield break;
+        }
+
+        // 3. Real-Time Streaming from Ollama
+        var ollamaBaseUrl = _configuration["Ollama:BaseUrl"] ?? "http://localhost:11434";
+        var ollamaModel = _configuration["Ollama:Model"] ?? "qwen2.5:7b";
+
+        var promptBuilder = new System.Text.StringBuilder();
+        promptBuilder.AppendLine($"You are an academic study assistant for course {subjectCode}.");
+        promptBuilder.AppendLine("Answer the user's question accurately, concisely, and directly based ONLY on the provided context passages below.");
+        promptBuilder.AppendLine("Rules:");
+        promptBuilder.AppendLine("1. Respond in the exact same language as the user's question (e.g. English if asked in English, Vietnamese if asked in Vietnamese).");
+        promptBuilder.AppendLine("2. Attach inline citation markers [1], [2], etc. directly after each claim or fact extracted from that source.");
+        promptBuilder.AppendLine("3. If the context does not mention a specific detail, state that it is not covered in the provided material.");
+        promptBuilder.AppendLine("4. Do NOT output greetings, conversational filler, or introductory meta text.");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("CONTEXT PASSAGES:");
+
+        foreach (var c in citations)
+        {
+            promptBuilder.AppendLine($"---");
+            promptBuilder.AppendLine($"[Source {c.Index}] Document: {c.DocumentTitle} | Page {c.PageNumber} | Heading: {c.Heading ?? "General"}");
+            promptBuilder.AppendLine(c.Snippet);
+        }
+        promptBuilder.AppendLine("---");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine($"USER QUESTION: {request.Message}");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("GROUNDED ANSWER:");
+
+        var fullAnswerBuilder = new System.Text.StringBuilder();
+        bool streamedSuccessfully = false;
+
+        await foreach (var token in StreamOllamaTokensAsync(ollamaBaseUrl, ollamaModel, promptBuilder.ToString(), cancellationToken))
+        {
+            fullAnswerBuilder.Append(token);
+            yield return new ChatStreamPacket
+            {
+                Type = "token",
+                Token = token,
+                SessionId = session.Id,
+                SessionTitle = session.Title
+            };
+            streamedSuccessfully = true;
+        }
+
+        string finalAnswer;
+        if (!streamedSuccessfully || fullAnswerBuilder.Length == 0)
+        {
+            finalAnswer = FallbackSynthesizeGroundedAnswer(request.Message, citations);
+            yield return new ChatStreamPacket
+            {
+                Type = "token",
+                Token = finalAnswer,
+                SessionId = session.Id,
+                SessionTitle = session.Title
+            };
+        }
+        else
+        {
+            finalAnswer = fullAnswerBuilder.ToString().Trim();
+        }
+
+        // Renumber citations based on order of appearance in final text
+        var (renumberedAnswer, finalCitations) = RenumberCitationsInOrderOfAppearance(finalAnswer, citations);
+
+        // 4. Save Assistant Message
+        var assistantMessage = new ChatMessage
+        {
+            SessionId = session.Id,
+            Role = "assistant",
+            Content = renumberedAnswer,
+            CitationsJson = finalCitations.Count > 0 ? JsonSerializer.Serialize(finalCitations) : null,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.ChatMessages.Add(assistantMessage);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        yield return new ChatStreamPacket
+        {
+            Type = "done",
+            SessionId = session.Id,
+            SessionTitle = session.Title,
+            AssistantMessage = new ChatMessageDto
+            {
+                Id = assistantMessage.Id,
+                Role = "assistant",
+                Content = assistantMessage.Content,
+                Citations = finalCitations,
                 CreatedAt = assistantMessage.CreatedAt
             }
         };
@@ -376,37 +584,34 @@ public partial class RagChatService : IRagChatService
 
     #region LLM & Helper Methods
 
-    private async Task<(string Answer, List<string> FollowUps)> GenerateAnswerWithLlmAsync(string query, List<CitationDto> citations, string subjectCode)
+    private async Task<string> GenerateAnswerWithLlmAsync(string query, List<CitationDto> citations, string subjectCode)
     {
         var ollamaBaseUrl = _configuration["Ollama:BaseUrl"] ?? "http://localhost:11434";
         var ollamaModel = _configuration["Ollama:Model"] ?? "qwen2.5:7b";
 
-        // Build Structured Grounding Prompt with Follow-Up Request
+        // Build Clean, High-Precision Grounding Prompt
         var promptBuilder = new System.Text.StringBuilder();
-        promptBuilder.AppendLine($"BẠN LÀ TRỢ LÝ HỌC TẬP AI DÀNH RIÊNG CHO MÔN HỌC {subjectCode}.");
-        promptBuilder.AppendLine("QUY TẮC BẮT BUỘC (STRICT GROUNDING):");
-        promptBuilder.AppendLine("1. BẠN CHỈ ĐƯỢC TRẢ LỜI DỰA TRÊN THÔNG TIN TRONG PHẦN [NGỮ CẢNH TÀI LIỆU] DƯỚI ĐÂY.");
-        promptBuilder.AppendLine("2. TUYỆT ĐỐI KHÔNG SỬ DỤNG KIẾN THỨC BÊN NGOÀI ĐỂ BỔ SUNG.");
-        promptBuilder.AppendLine("3. ĐÍNH KÈM TRÍCH DẪN NGUỒN CỤ THỂ DƯỚI DẠNG [1], [2] TƯƠNG ỨNG VỚI NGUỒN ĐƯỢC ĐÁNH SỐ.");
-        promptBuilder.AppendLine("4. NẾU TÀI LIỆU KHÔNG CHỨA ĐỦ THÔNG TIN, HÃY NÓI RÕ RẰNG TÀI LIỆU KHÔNG ĐỀ CẬP.");
-        promptBuilder.AppendLine("5. CUỐI CÂU TRẢ LỜI, HÃY GỢI Ý 2 ĐẾN 3 CÂU HỎI TIẾP THEO THEO ĐỊNH DẠNG:");
-        promptBuilder.AppendLine("---SUGGESTED_QUESTIONS---");
-        promptBuilder.AppendLine("- Câu hỏi gợi ý 1?");
-        promptBuilder.AppendLine("- Câu hỏi gợi ý 2?");
+        promptBuilder.AppendLine($"You are an academic study assistant for course {subjectCode}.");
+        promptBuilder.AppendLine("Answer the user's question accurately, concisely, and directly based ONLY on the provided context passages below.");
+        promptBuilder.AppendLine("Rules:");
+        promptBuilder.AppendLine("1. Respond in the exact same language as the user's question (e.g. English if asked in English, Vietnamese if asked in Vietnamese).");
+        promptBuilder.AppendLine("2. Attach inline citation markers [1], [2], etc. directly after each claim or fact extracted from that source.");
+        promptBuilder.AppendLine("3. If the context does not mention a specific detail, state that it is not covered in the provided material.");
+        promptBuilder.AppendLine("4. Do NOT output greetings, conversational filler, or introductory meta text.");
         promptBuilder.AppendLine();
-        promptBuilder.AppendLine("[NGỮ CẢNH TÀI LIỆU]:");
+        promptBuilder.AppendLine("CONTEXT PASSAGES:");
 
         foreach (var c in citations)
         {
             promptBuilder.AppendLine($"---");
-            promptBuilder.AppendLine($"[Nguồn {c.Index}] Tài liệu: {c.DocumentTitle} | Trang {c.PageNumber} | Mục: {c.Heading ?? "Chung"}");
-            promptBuilder.AppendLine($"Nội dung: {c.Snippet}");
+            promptBuilder.AppendLine($"[Source {c.Index}] Document: {c.DocumentTitle} | Page {c.PageNumber} | Heading: {c.Heading ?? "General"}");
+            promptBuilder.AppendLine(c.Snippet);
         }
         promptBuilder.AppendLine("---");
         promptBuilder.AppendLine();
-        promptBuilder.AppendLine($"CÂU HỎI CỦA SINH VIÊN: {query}");
+        promptBuilder.AppendLine($"USER QUESTION: {query}");
         promptBuilder.AppendLine();
-        promptBuilder.AppendLine("CÂU TRẢ LỜI (Được trích dẫn chuẩn xác):");
+        promptBuilder.AppendLine("GROUNDED ANSWER:");
 
         var prompt = promptBuilder.ToString();
 
@@ -422,8 +627,10 @@ public partial class RagChatService : IRagChatService
                 stream = false,
                 options = new
                 {
-                    temperature = 0.2,
-                    top_p = 0.9
+                    temperature = 0.1,
+                    top_p = 0.9,
+                    num_ctx = 2048,
+                    num_predict = 350
                 }
             };
 
@@ -436,68 +643,37 @@ public partial class RagChatService : IRagChatService
                 var result = JsonSerializer.Deserialize<OllamaResponse>(responseString);
                 if (result != null && !string.IsNullOrWhiteSpace(result.Response))
                 {
-                    return ParseLlmResponseAndFollowUps(result.Response.Trim(), citations);
+                    return result.Response.Trim();
                 }
             }
         }
         catch
         {
-            // Ollama is offline, fallback to deterministic semantic extraction
+            // Ollama offline / timeout
         }
 
         // Fallback Synthesizer
         return FallbackSynthesizeGroundedAnswer(query, citations);
     }
 
-    private static (string Answer, List<string> FollowUps) ParseLlmResponseAndFollowUps(string fullText, List<CitationDto> citations)
+    private static string FallbackSynthesizeGroundedAnswer(string query, List<CitationDto> citations)
     {
-        var delimiter = "---SUGGESTED_QUESTIONS---";
-        var followUps = new List<string>();
-
-        if (fullText.Contains(delimiter, StringComparison.OrdinalIgnoreCase))
-        {
-            var parts = fullText.Split([delimiter], StringSplitOptions.None);
-            var answer = parts[0].Trim();
-            var questionsPart = parts.Length > 1 ? parts[1].Trim() : "";
-
-            var lines = questionsPart.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-            foreach (var line in lines)
-            {
-                var clean = line.Trim().TrimStart('-', '*', '•', '1', '2', '3', '.', ' ').Trim();
-                if (!string.IsNullOrWhiteSpace(clean) && clean.Length > 5)
-                {
-                    followUps.Add(clean);
-                }
-            }
-
-            return (answer, followUps.Count > 0 ? followUps.Take(3).ToList() : GenerateDynamicFollowUps(citations));
-        }
-
-        return (fullText, GenerateDynamicFollowUps(citations));
-    }
-
-    private static (string Answer, List<string> FollowUps) FallbackSynthesizeGroundedAnswer(string query, List<CitationDto> citations)
-    {
-        var primaryCitation = citations[0];
-        var badgeList = string.Join(" ", citations.Select(c => $"[{c.Index}]"));
-
         var responseBuilder = new System.Text.StringBuilder();
-        responseBuilder.AppendLine($"Dựa trên các tài liệu học tập được chọn {badgeList}, tổng hợp nội dung cho câu hỏi của bạn như sau:\n");
 
         for (int i = 0; i < citations.Count; i++)
         {
             var cit = citations[i];
             var cleanSnippet = cit.Snippet.Replace("\r", "").Replace("\n", " ").Trim();
-            if (cleanSnippet.Length > 160) cleanSnippet = cleanSnippet[..160] + "...";
+            if (cleanSnippet.Length > 240) cleanSnippet = cleanSnippet[..240] + "...";
 
-            responseBuilder.AppendLine($"• **Trọng tâm {i + 1}**: {cleanSnippet} [{cit.Index}]");
+            var headingPrefix = !string.IsNullOrWhiteSpace(cit.Heading) && cit.Heading != "Chung"
+                ? $"**{cit.Heading}**: "
+                : "";
+
+            responseBuilder.AppendLine($"• {headingPrefix}{cleanSnippet} [{cit.Index}]\n");
         }
 
-        responseBuilder.AppendLine();
-        responseBuilder.AppendLine($"> 📖 *Nguồn trích dẫn: **{primaryCitation.DocumentTitle}** (Trang {primaryCitation.PageNumber})*");
-
-        var followUps = GenerateDynamicFollowUps(citations);
-        return (responseBuilder.ToString(), followUps);
+        return responseBuilder.ToString().Trim();
     }
 
     private static List<string> GenerateDynamicFollowUps(List<CitationDto> citations)
@@ -528,15 +704,121 @@ public partial class RagChatService : IRagChatService
         return words;
     }
 
-    private static double ComputeSimilarity(List<string> queryTokens, List<string> chunkTokens)
+    private static double ComputeLexicalSimilarity(List<string> queryTokens, List<string> chunkTokens)
     {
         if (queryTokens.Count == 0 || chunkTokens.Count == 0) return 0.0;
         var intersection = queryTokens.Intersect(chunkTokens).Count();
         if (intersection == 0) return 0.0;
+        return (double)intersection / Math.Sqrt(queryTokens.Count * chunkTokens.Count);
+    }
 
-        // Jaccard-Cosine Hybrid Metric
-        double score = (double)intersection / Math.Sqrt(queryTokens.Count * chunkTokens.Count);
-        return score;
+    private static double CosineSimilarity(float[] a, float[] b)
+    {
+        if (a.Length != b.Length) return 0.0;
+        double dot = 0, magA = 0, magB = 0;
+        for (int i = 0; i < a.Length; i++) { dot += a[i] * b[i]; magA += a[i] * a[i]; magB += b[i] * b[i]; }
+        double denom = Math.Sqrt(magA) * Math.Sqrt(magB);
+        return denom < 1e-8 ? 0.0 : dot / denom;
+    }
+
+    private async IAsyncEnumerable<string> StreamOllamaTokensAsync(
+
+        string baseUrl, 
+        string model, 
+        string prompt, 
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var httpClient = _httpClientFactory.CreateClient();
+        httpClient.Timeout = TimeSpan.FromSeconds(60);
+
+        var requestBody = new
+        {
+            model,
+            prompt,
+            stream = true,
+            options = new
+            {
+                temperature = 0.1,
+                top_p = 0.9,
+                num_ctx = 2048,
+                num_predict = 350
+            }
+        };
+
+        var jsonContent = new StringContent(JsonSerializer.Serialize(requestBody), System.Text.Encoding.UTF8, "application/json");
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl.TrimEnd('/')}/api/generate")
+        {
+            Content = jsonContent
+        };
+
+        HttpResponseMessage? response = null;
+        try
+        {
+            response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        }
+        catch
+        {
+            yield break;
+        }
+
+        if (response != null && response.IsSuccessStatusCode)
+        {
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var reader = new StreamReader(stream);
+
+            while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
+            {
+                string? line = null;
+                try
+                {
+                    line = await reader.ReadLineAsync(cancellationToken);
+                }
+                catch
+                {
+                    break;
+                }
+
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                OllamaResponse? chunk = null;
+                try
+                {
+                    chunk = JsonSerializer.Deserialize<OllamaResponse>(line);
+                }
+                catch { }
+
+                if (chunk != null && !string.IsNullOrEmpty(chunk.Response))
+                {
+                    yield return chunk.Response;
+                }
+
+                if (chunk?.Done == true) break;
+            }
+        }
+    }
+
+    private async Task<float[]?> GetQueryEmbeddingAsync(string query)
+
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient("Ollama");
+            var response = await client.PostAsJsonAsync("http://localhost:11434/api/embeddings", new
+            {
+                model = "nomic-embed-text",
+                prompt = query
+            });
+            if (!response.IsSuccessStatusCode) return null;
+            var result = await response.Content.ReadFromJsonAsync<OllamaEmbeddingResult>();
+            return result?.Embedding;
+        }
+        catch { return null; }
+    }
+
+    private sealed class OllamaEmbeddingResult
+    {
+        [JsonPropertyName("embedding")]
+        public float[]? Embedding { get; set; }
     }
 
     private static string TruncateSnippet(string content, int maxLen)
@@ -566,6 +848,78 @@ public partial class RagChatService : IRagChatService
     [GeneratedRegex(@"\s+")]
     private static partial Regex WhiteSpaceRegex();
 
+    private static (string RenumberedAnswer, List<CitationDto> ReorderedCitations) RenumberCitationsInOrderOfAppearance(string answer, List<CitationDto> originalCitations)
+    {
+        if (string.IsNullOrWhiteSpace(answer) || originalCitations.Count == 0) return (answer, originalCitations);
+
+        var matches = Regex.Matches(answer, @"\[(\d+)\]");
+        if (matches.Count == 0) return (answer, originalCitations);
+
+        var oldToNewMap = new Dictionary<int, int>();
+        int newIndexCounter = 1;
+
+        foreach (Match match in matches)
+        {
+            if (int.TryParse(match.Groups[1].Value, out int oldIdx))
+            {
+                if (originalCitations.Any(c => c.Index == oldIdx) && !oldToNewMap.ContainsKey(oldIdx))
+                {
+                    oldToNewMap[oldIdx] = newIndexCounter++;
+                }
+            }
+        }
+
+        if (oldToNewMap.Count == 0) return (answer, originalCitations);
+
+        // Replace in text with temp tokens first to avoid collisions
+        string updatedAnswer = answer;
+        foreach (var (oldIdx, newIdx) in oldToNewMap)
+        {
+            updatedAnswer = updatedAnswer.Replace($"[{oldIdx}]", $"{{#CIT_{newIdx}#}}");
+        }
+        foreach (var (_, newIdx) in oldToNewMap)
+        {
+            updatedAnswer = updatedAnswer.Replace($"{{#CIT_{newIdx}#}}", $"[{newIdx}]");
+        }
+
+        // Build reordered & renumbered list of citations
+        var reorderedCitations = new List<CitationDto>();
+        foreach (var (oldIdx, newIdx) in oldToNewMap.OrderBy(kv => kv.Value))
+        {
+            var original = originalCitations.FirstOrDefault(c => c.Index == oldIdx);
+            if (original != null)
+            {
+                reorderedCitations.Add(new CitationDto
+                {
+                    Index = newIdx,
+                    ChunkId = original.ChunkId,
+                    DocumentTitle = original.DocumentTitle,
+                    PageNumber = original.PageNumber,
+                    Heading = original.Heading,
+                    Snippet = original.Snippet,
+                    SimilarityScore = original.SimilarityScore
+                });
+            }
+        }
+
+        // Add any remaining unused citations at the end if needed
+        foreach (var unused in originalCitations.Where(c => !oldToNewMap.ContainsKey(c.Index)))
+        {
+            reorderedCitations.Add(new CitationDto
+            {
+                Index = newIndexCounter++,
+                ChunkId = unused.ChunkId,
+                DocumentTitle = unused.DocumentTitle,
+                PageNumber = unused.PageNumber,
+                Heading = unused.Heading,
+                Snippet = unused.Snippet,
+                SimilarityScore = unused.SimilarityScore
+            });
+        }
+
+        return (updatedAnswer, reorderedCitations);
+    }
+
     private sealed class OllamaResponse
     {
         [JsonPropertyName("response")]
@@ -577,3 +931,4 @@ public partial class RagChatService : IRagChatService
 
     #endregion
 }
+

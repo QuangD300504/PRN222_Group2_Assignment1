@@ -89,3 +89,13 @@ public class ChatSessionMessagesResponse
     public List<int> SelectedDocumentIds { get; set; } = [];
     public List<ChatMessageDto> Messages { get; set; } = [];
 }
+
+public class ChatStreamPacket
+{
+    public string Type { get; set; } = "token"; // "init", "token", "done", "error"
+    public string Token { get; set; } = string.Empty;
+    public int SessionId { get; set; }
+    public string SessionTitle { get; set; } = string.Empty;
+    public ChatMessageDto? UserMessage { get; set; }
+    public ChatMessageDto? AssistantMessage { get; set; }
+}

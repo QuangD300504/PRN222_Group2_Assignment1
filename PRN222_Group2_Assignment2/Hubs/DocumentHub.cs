@@ -1,9 +1,26 @@
+using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.SignalR;
+using PRN222_Group2_Assignment1.Services;
+using PRN222_Group2_Assignment1.ViewModels;
 
 namespace PRN222_Group2_Assignment2.Hubs
 {
-    public class DocumentHub : Hub
+    public class DocumentHub(IRagChatService ragChatService) : Hub
     {
+        public async IAsyncEnumerable<ChatStreamPacket> StreamChatMessage(
+            SendChatRequest request, 
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var httpContext = Context.GetHttpContext();
+            var userIdStr = httpContext?.Session.GetString("UserId") ?? httpContext?.Session.GetInt32("UserId")?.ToString();
+            int userId = int.TryParse(userIdStr, out var parsedId) ? parsedId : 1;
+
+            await foreach (var packet in ragChatService.StreamChatQueryAsync(request, userId, cancellationToken))
+            {
+                yield return packet;
+            }
+        }
+
         public async Task NotifyEditingSubject(int subjectId, string subjectCode, string userName)
         {
             await Clients.Others.SendAsync("UserEditingSubject", userName, subjectId, subjectCode);
