@@ -22,14 +22,14 @@
 ## Category 1: Single-Document Technical Fact Extraction
 
 ### Q01: What is the fundamental difference between TCP and UDP regarding connection and acknowledgement?
-* **Source Document**: `Chapter 01 - Networking Programming.pdf` (Slide 6)
+* **Source Document**: `Chapter 01 - Networking Programming.pdf` (Slide 6, 53)
 * **Ground Truth Answer**: TCP is a connection-based protocol (single connecting line) that provides reliable data flow based on an acknowledgement mechanism. In contrast, UDP is connectionless, sending independent datagram packets with no arrival guarantees and no acknowledgement mechanism.
-* **Expected Citations**: `[1]` Slide 6
+* **Expected Citations**: `[1]` Slide 6 (Definitions), `[2]` Slide 53 (Working UDP Services)
 
 ### Q02: What is the bit length of IPv4 and IPv6 addresses according to the networking basics slide?
 * **Source Document**: `Chapter 01 - Networking Programming.pdf` (Slide 5, 9)
 * **Ground Truth Answer**: An IPv4 address is 4 bytes (32-bit unsigned integer), such as `192.143.5.1`. An IPv6 address is 16 bytes (128-bit unsigned integer).
-* **Expected Citations**: `[1]` Slide 5 / Slide 9
+* **Expected Citations**: `[1]` Slide 5
 
 ### Q03: What are the three main components that make up the Domain Name System (DNS)?
 * **Source Document**: `Chapter 01 - Networking Programming.pdf` (Slide 33)
@@ -101,9 +101,9 @@
 ## Category 2: Cross-Lingual / Bilingual Retrieval (VI Question $\rightarrow$ EN Slides)
 
 ### Q16: Giao thức TCP đảm bảo tính tin cậy của luồng truyền dữ liệu giữa hai máy tính bằng cơ chế nào?
-* **Source Document**: `Chapter 01 - Networking Programming.pdf` (Slide 6)
+* **Source Document**: `Chapter 01 - Networking Programming.pdf` (Slide 36)
 * **Ground Truth Answer**: TCP đảm bảo luồng truyền dữ liệu tin cậy thông qua cơ chế xác nhận (acknowledgement mechanism) và thiết lập kết nối hướng liên kết (connection-based).
-* **Expected Citations**: `[1]` Slide 6
+* **Expected Citations**: `[1]` Slide 36
 
 ### Q17: Tại sao các ứng dụng sử dụng giao thức UDP phải tự xử lý các gói tin bị mất hoặc đảo lộn thứ tự?
 * **Source Document**: `Chapter 01 - Networking Programming.pdf` (Slide 53)
