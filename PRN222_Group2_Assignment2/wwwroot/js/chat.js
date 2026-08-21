@@ -320,15 +320,15 @@ function openInlineCitation(btn, index) {
         const citationsJson = bubble.getAttribute('data-citations');
         if (citationsJson) {
             const citations = JSON.parse(citationsJson);
-            const found = citations.find(c => c.index === parseInt(index, 10));
+            const targetIdx = parseInt(index, 10);
+            const found = citations.find(c => (c.index !== undefined ? c.index : c.Index) === targetIdx);
             if (found) {
                 populateAndShowCitationModal(
-                    found.index, 
-                    found.documentTitle || 'Tài liệu trích dẫn', 
-                    found.pageNumber || 1, 
-                    found.heading || 'Chung', 
-                    found.snippet || '', 
-                    found.similarityScore || 0.9
+                    found.index ?? found.Index ?? targetIdx, 
+                    found.documentTitle ?? found.DocumentTitle ?? 'Tài liệu trích dẫn', 
+                    found.pageNumber ?? found.PageNumber ?? 1, 
+                    found.heading ?? found.Heading ?? 'Chung', 
+                    found.snippet ?? found.Snippet ?? ''
                 );
                 return;
             }
@@ -338,13 +338,12 @@ function openInlineCitation(btn, index) {
     }
 }
 
-function populateAndShowCitationModal(index, title, page, heading, snippet, score) {
+function populateAndShowCitationModal(index, title, page, heading, snippet) {
     document.getElementById('modalCitIndexBadge').innerText = index;
     document.getElementById('modalCitDocTitle').innerText = title;
     document.getElementById('modalCitPage').innerText = page;
     document.getElementById('modalCitHeading').innerText = heading || 'Chung';
     document.getElementById('modalCitSnippet').innerText = snippet;
-    document.getElementById('modalCitScore').innerText = typeof score === 'number' ? score.toFixed(2) : score;
     
     const modal = new bootstrap.Modal(document.getElementById('citationModal'));
     modal.show();

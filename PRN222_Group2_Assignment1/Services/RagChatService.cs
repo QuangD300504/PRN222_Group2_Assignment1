@@ -199,7 +199,7 @@ public partial class RagChatService : IRagChatService
         return true;
     }
 
-    public async Task<List<CitationDto>> RetrieveRelevantChunksAsync(string query, List<int> selectedDocIds, int topK = 4)
+    public async Task<List<CitationDto>> RetrieveRelevantChunksAsync(string query, List<int> selectedDocIds, int topK = 6)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
 
@@ -229,30 +229,38 @@ public partial class RagChatService : IRagChatService
         // Try to get the query vector from Ollama (nomic-embed-text)
         float[]? queryVector = await GetQueryEmbeddingAsync(query);
 
-        var queryTokens = Tokenize(query);
+        var queryTokens = Tokenize(query).Where(t => t.Length > 1).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var scored = candidateChunks.Select(chunk =>
         {
-            double score;
+            double vectorScore = 0.0;
             if (queryVector != null && chunk.HasEmbedding && !string.IsNullOrEmpty(chunk.EmbeddingVectorJson))
             {
-                // True cosine similarity on stored vectors
                 try
                 {
                     var chunkVec = JsonSerializer.Deserialize<float[]>(chunk.EmbeddingVectorJson);
-                    score = chunkVec != null ? CosineSimilarity(queryVector, chunkVec) : 0.0;
+                    vectorScore = chunkVec != null ? CosineSimilarity(queryVector, chunkVec) : 0.0;
                 }
-                catch { score = 0.0; }
+                catch { vectorScore = 0.0; }
             }
-            else
+
+            // Dynamic Lexical Overlap (Generic BM25/Sparse Token Fusion for any document)
+            var chunkTokens = Tokenize(chunk.Content + " " + (chunk.Heading ?? "")).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            double lexicalBonus = 0.0;
+            if (queryTokens.Count > 0 && chunkTokens.Count > 0)
             {
-                // ponytail: lexical fallback for chunks without embeddings (Ollama was offline at upload)
-                var chunkTokens = Tokenize(chunk.Content + " " + (chunk.Heading ?? ""));
-                score = queryTokens.Count > 0 ? ComputeLexicalSimilarity(queryTokens, chunkTokens) : 0.0;
+                int matchCount = queryTokens.Count(t => chunkTokens.Contains(t));
+                lexicalBonus = ((double)matchCount / queryTokens.Count) * 0.15;
             }
-            return new { Chunk = chunk, Score = score };
+
+            // Generic Hybrid Fusion: Dense Semantic Vector (nomic-embed-text) + Sparse Keyword Bonus
+            double combinedScore = vectorScore > 0 
+                ? (vectorScore + lexicalBonus)
+                : (queryTokens.Count > 0 ? ComputeLexicalSimilarity(queryTokens.ToList(), chunkTokens.ToList()) : 0.0);
+
+            return new { Chunk = chunk, Score = combinedScore, RawVectorScore = vectorScore };
         })
-        .Where(x => x.Score > 0.05)
+        .Where(x => x.Score > 0.15)
         .OrderByDescending(x => x.Score)
         .Take(topK)
         .ToList();
@@ -329,8 +337,8 @@ public partial class RagChatService : IRagChatService
         _context.ChatMessages.Add(userMessage);
         await _context.SaveChangesAsync();
 
-        // 2. RAG Retrieval Step
-        var citations = await RetrieveRelevantChunksAsync(request.Message, request.SelectedDocumentIds ?? [], topK: 4);
+        // 2. RAG Retrieval Step (topK = 6)
+        var citations = await RetrieveRelevantChunksAsync(request.Message, request.SelectedDocumentIds ?? [], topK: 6);
 
         // 3. Grounding & Response Synthesis
         string assistantAnswer;
@@ -457,8 +465,8 @@ public partial class RagChatService : IRagChatService
             UserMessage = userMessageDto
         };
 
-        // 2. Vector Retrieval Step
-        var citations = await RetrieveRelevantChunksAsync(request.Message, request.SelectedDocumentIds ?? [], topK: 4);
+        // 2. Vector Retrieval Step (topK = 6)
+        var citations = await RetrieveRelevantChunksAsync(request.Message, request.SelectedDocumentIds ?? [], topK: 6);
 
         if (citations.Count == 0)
         {
@@ -501,8 +509,9 @@ public partial class RagChatService : IRagChatService
         promptBuilder.AppendLine("Rules:");
         promptBuilder.AppendLine("1. Respond in the exact same language as the user's question (e.g. English if asked in English, Vietnamese if asked in Vietnamese).");
         promptBuilder.AppendLine("2. Attach inline citation markers [1], [2], etc. directly after each claim or fact extracted from that source.");
-        promptBuilder.AppendLine("3. If the context does not mention a specific detail, state that it is not covered in the provided material.");
-        promptBuilder.AppendLine("4. Do NOT output greetings, conversational filler, or introductory meta text.");
+        promptBuilder.AppendLine("3. Synthesize and extract relevant facts, definitions, properties, and values from the context passages.");
+        promptBuilder.AppendLine("4. If the context passages genuinely do not contain information to answer the question, state that it is not covered in the provided material.");
+        promptBuilder.AppendLine("5. Do NOT output greetings, conversational filler, or introductory meta text.");
         promptBuilder.AppendLine();
         promptBuilder.AppendLine("CONTEXT PASSAGES:");
 
@@ -596,8 +605,9 @@ public partial class RagChatService : IRagChatService
         promptBuilder.AppendLine("Rules:");
         promptBuilder.AppendLine("1. Respond in the exact same language as the user's question (e.g. English if asked in English, Vietnamese if asked in Vietnamese).");
         promptBuilder.AppendLine("2. Attach inline citation markers [1], [2], etc. directly after each claim or fact extracted from that source.");
-        promptBuilder.AppendLine("3. If the context does not mention a specific detail, state that it is not covered in the provided material.");
-        promptBuilder.AppendLine("4. Do NOT output greetings, conversational filler, or introductory meta text.");
+        promptBuilder.AppendLine("3. Synthesize and extract relevant facts, definitions, properties, and values from the context passages.");
+        promptBuilder.AppendLine("4. If the context passages genuinely do not contain information to answer the question, state that it is not covered in the provided material.");
+        promptBuilder.AppendLine("5. Do NOT output greetings, conversational filler, or introductory meta text.");
         promptBuilder.AppendLine();
         promptBuilder.AppendLine("CONTEXT PASSAGES:");
 
@@ -629,8 +639,8 @@ public partial class RagChatService : IRagChatService
                 {
                     temperature = 0.1,
                     top_p = 0.9,
-                    num_ctx = 2048,
-                    num_predict = 350
+                    num_ctx = 4096,
+                    num_predict = 1024
                 }
             };
 
@@ -740,8 +750,8 @@ public partial class RagChatService : IRagChatService
             {
                 temperature = 0.1,
                 top_p = 0.9,
-                num_ctx = 2048,
-                num_predict = 350
+                num_ctx = 4096,
+                num_predict = 1024
             }
         };
 
