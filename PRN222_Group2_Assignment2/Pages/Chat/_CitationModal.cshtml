@@ -11,14 +11,15 @@
             </div>
             <div class="modal-body p-4">
                 <div class="d-flex align-items-center justify-content-between mb-3">
-                    <div class="fs-8 text-slate-400">
-                        <i class="bi bi-file-text me-1"></i> Trang: <strong id="modalCitPage" class="text-slate-200">1</strong>
-                        <span class="mx-2">·</span>
-                        <i class="bi bi-bookmark me-1"></i> Mục: <strong id="modalCitHeading" class="text-slate-200">Tổng quan</strong>
+                    <div class="fs-8 text-slate-400 d-flex align-items-center flex-wrap gap-2">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 rounded" id="modalCitChunkBadge">Chunk #1</span>
+                        <span><i class="bi bi-file-text me-1"></i> Trang: <strong id="modalCitPage" class="text-slate-200">1</strong></span>
+                        <span class="text-slate-600">·</span>
+                        <span><i class="bi bi-bookmark me-1"></i> Mục: <strong id="modalCitHeading" class="text-slate-200">Tổng quan</strong></span>
                     </div>
                 </div>
 
-                <div class="p-3 rounded-3 bg-slate-950 border border-slate-800/80 text-slate-300 fs-7 line-relaxed custom-scrollbar" style="max-height: 260px; overflow-y: auto;" id="modalCitSnippet">
+                <div class="p-3 rounded-3 bg-slate-950 border border-slate-800/80 text-slate-300 fs-7 line-relaxed custom-scrollbar font-monospace" style="max-height: 260px; overflow-y: auto;" id="modalCitSnippet">
                     Nội dung trích xuất từ tài liệu...
                 </div>
             </div>

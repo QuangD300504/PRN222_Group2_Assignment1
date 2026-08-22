@@ -215,6 +215,7 @@ public partial class RagChatService : IRagChatService
             {
                 c.Id,
                 c.DocumentId,
+                c.ChunkIndex,
                 DocTitle = c.Document.Title,
                 c.PageNumber,
                 c.Heading,
@@ -273,6 +274,7 @@ public partial class RagChatService : IRagChatService
             {
                 Index = i + 1,
                 ChunkId = item.Chunk.Id,
+                ChunkIndex = item.Chunk.ChunkIndex + 1,
                 DocumentTitle = item.Chunk.DocTitle,
                 PageNumber = item.Chunk.PageNumber,
                 Heading = item.Chunk.Heading,
@@ -508,7 +510,7 @@ public partial class RagChatService : IRagChatService
         promptBuilder.AppendLine("Answer the user's question accurately, concisely, and directly based ONLY on the provided context passages below.");
         promptBuilder.AppendLine("Rules:");
         promptBuilder.AppendLine("1. Respond in the exact same language as the user's question (e.g. English if asked in English, Vietnamese if asked in Vietnamese).");
-        promptBuilder.AppendLine("2. Attach inline citation markers [1], [2], etc. directly after each claim or fact extracted from that source.");
+        promptBuilder.AppendLine("2. Attach inline citation markers [1], [2], etc. directly after each claim or fact extracted from that source. Always write individual markers like [1] [2], never group them like [1, 2].");
         promptBuilder.AppendLine("3. Synthesize and extract relevant facts, definitions, properties, and values from the context passages.");
         promptBuilder.AppendLine("4. If the context passages genuinely do not contain information to answer the question, state that it is not covered in the provided material.");
         promptBuilder.AppendLine("5. Do NOT output greetings, conversational filler, or introductory meta text.");
@@ -604,7 +606,7 @@ public partial class RagChatService : IRagChatService
         promptBuilder.AppendLine("Answer the user's question accurately, concisely, and directly based ONLY on the provided context passages below.");
         promptBuilder.AppendLine("Rules:");
         promptBuilder.AppendLine("1. Respond in the exact same language as the user's question (e.g. English if asked in English, Vietnamese if asked in Vietnamese).");
-        promptBuilder.AppendLine("2. Attach inline citation markers [1], [2], etc. directly after each claim or fact extracted from that source.");
+        promptBuilder.AppendLine("2. Attach inline citation markers [1], [2], etc. directly after each claim or fact extracted from that source. Always write individual markers like [1] [2], never group them like [1, 2].");
         promptBuilder.AppendLine("3. Synthesize and extract relevant facts, definitions, properties, and values from the context passages.");
         promptBuilder.AppendLine("4. If the context passages genuinely do not contain information to answer the question, state that it is not covered in the provided material.");
         promptBuilder.AppendLine("5. Do NOT output greetings, conversational filler, or introductory meta text.");
@@ -862,8 +864,15 @@ public partial class RagChatService : IRagChatService
     {
         if (string.IsNullOrWhiteSpace(answer) || originalCitations.Count == 0) return (answer, originalCitations);
 
-        var matches = Regex.Matches(answer, @"\[(\d+)\]");
-        if (matches.Count == 0) return (answer, originalCitations);
+        // Normalize grouped brackets like [1, 2] or [1, 5] into separate brackets [1] [2]
+        string normalizedAnswer = Regex.Replace(answer, @"\[(\d+(?:\s*,\s*\d+)+)\]", m =>
+        {
+            var numbers = m.Groups[1].Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return string.Join(" ", numbers.Select(n => $"[{n}]"));
+        });
+
+        var matches = Regex.Matches(normalizedAnswer, @"\[(\d+)\]");
+        if (matches.Count == 0) return (normalizedAnswer, originalCitations);
 
         var oldToNewMap = new Dictionary<int, int>();
         int newIndexCounter = 1;
@@ -879,10 +888,10 @@ public partial class RagChatService : IRagChatService
             }
         }
 
-        if (oldToNewMap.Count == 0) return (answer, originalCitations);
+        if (oldToNewMap.Count == 0) return (normalizedAnswer, originalCitations);
 
         // Replace in text with temp tokens first to avoid collisions
-        string updatedAnswer = answer;
+        string updatedAnswer = normalizedAnswer;
         foreach (var (oldIdx, newIdx) in oldToNewMap)
         {
             updatedAnswer = updatedAnswer.Replace($"[{oldIdx}]", $"{{#CIT_{newIdx}#}}");
@@ -903,6 +912,7 @@ public partial class RagChatService : IRagChatService
                 {
                     Index = newIdx,
                     ChunkId = original.ChunkId,
+                    ChunkIndex = original.ChunkIndex,
                     DocumentTitle = original.DocumentTitle,
                     PageNumber = original.PageNumber,
                     Heading = original.Heading,
@@ -919,6 +929,7 @@ public partial class RagChatService : IRagChatService
             {
                 Index = newIndexCounter++,
                 ChunkId = unused.ChunkId,
+                ChunkIndex = unused.ChunkIndex,
                 DocumentTitle = unused.DocumentTitle,
                 PageNumber = unused.PageNumber,
                 Heading = unused.Heading,

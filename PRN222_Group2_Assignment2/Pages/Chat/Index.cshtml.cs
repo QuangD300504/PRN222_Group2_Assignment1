@@ -80,6 +80,12 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostUploadSourceAsync([FromForm] UploadDocumentViewModel input, [FromForm] string? connectionId)
     {
+        var role = HttpContext.Session.GetString("UserRole") ?? "";
+        if (!string.Equals(role.Trim(), "SubjectLeader", StringComparison.OrdinalIgnoreCase))
+        {
+            return new JsonResult(new { success = false, message = "Chỉ Trưởng bộ môn (SubjectLeader) mới có quyền tải lên tài liệu." });
+        }
+
         if (!string.IsNullOrEmpty(connectionId))
         {
             await _hubContext.Clients.Client(connectionId).SendAsync("UploadProgress", 20, "1/4: Đang đọc tệp và tính toán mã băm SHA-256...");

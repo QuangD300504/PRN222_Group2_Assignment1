@@ -151,29 +151,24 @@ function appendNewSourceDocument(doc) {
                        doc.fileExtension === '.docx' ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-warning-subtle text-warning border border-warning-subtle';
     const extName = (doc.fileExtension || '').toUpperCase().replace('.', '');
 
-    const label = document.createElement('label');
-    label.id = `sourceDocItem-${doc.id}`;
-    label.className = 'source-item d-flex align-items-center gap-2 px-2-5 py-2 rounded-3 border border-slate-800 bg-slate-900/50 hover-bg-slate-850 cursor-pointer transition';
-    label.innerHTML = `
-        <input type="checkbox" class="source-checkbox form-check-input flex-shrink-0 m-0" value="${doc.id}" checked data-title="${escapeHtml(doc.title)}" />
-        <div class="d-flex align-items-center gap-1-5 overflow-hidden flex-grow-1" style="min-width: 0;">
-            <span class="badge ${badgeClass} fs-9 flex-shrink-0">${extName}</span>
-            <span class="fs-8 text-slate-200 fw-medium text-truncate" title="${escapeHtml(doc.title)}">${escapeHtml(doc.title)}</span>
-        </div>
+    const div = document.createElement('div');
+    div.id = `sourceDocItem-${doc.id}`;
+    div.className = 'source-item d-flex align-items-center gap-2 px-2-5 py-2 rounded-3 border border-slate-800 bg-slate-900/50 hover-bg-slate-850 transition';
+    div.dataset.docId = doc.id;
+    div.dataset.title = doc.title;
+    div.innerHTML = `
+        <span class="badge ${badgeClass} fs-9 flex-shrink-0">${extName}</span>
+        <span class="fs-8 text-slate-200 fw-medium text-truncate" title="${escapeHtml(doc.title)}">${escapeHtml(doc.title)}</span>
     `;
 
-    label.querySelector('.source-checkbox').addEventListener('change', () => {
-        updateSelectedSourcesCount();
-        renderDynamicStarterPrompts();
-    });
-    sourcesList.prepend(label);
+    sourcesList.prepend(div);
 
     const slimList = document.getElementById('slimSourcesList');
     if (slimList) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn btn-icon btn-sm text-primary p-2 rounded-2 hover-bg-slate-800';
-        btn.title = `${doc.title} (${doc.chunkCount} chunks)`;
+        btn.title = doc.title;
         btn.innerHTML = '<i class="bi bi-file-earmark-text fs-5"></i>';
         slimList.prepend(btn);
     }
@@ -196,11 +191,19 @@ function toggleRightSidebar() {
 }
 
 function getSelectedDocIds() {
+    const docItems = document.querySelectorAll('.source-item[data-doc-id]');
+    if (docItems.length > 0) {
+        return Array.from(docItems).map(item => parseInt(item.dataset.docId, 10)).filter(id => !isNaN(id) && id > 0);
+    }
     const checkedBoxes = document.querySelectorAll('.source-checkbox:checked');
-    return Array.from(checkedBoxes).map(cb => parseInt(cb.value));
+    return Array.from(checkedBoxes).map(cb => parseInt(cb.value, 10));
 }
 
 function getSelectedDocTitles() {
+    const docItems = document.querySelectorAll('.source-item[data-doc-id]');
+    if (docItems.length > 0) {
+        return Array.from(docItems).map(item => item.dataset.title || item.querySelector('.text-slate-200')?.innerText?.trim() || 'Tài liệu');
+    }
     const checkedBoxes = document.querySelectorAll('.source-checkbox:checked');
     return Array.from(checkedBoxes).map(cb => {
         return cb.dataset.title || cb.closest('.source-item')?.querySelector('.text-slate-200')?.innerText?.trim() || 'Tài liệu';
@@ -208,28 +211,14 @@ function getSelectedDocTitles() {
 }
 
 function updateSelectedSourcesCount() {
-    const selected = getSelectedDocIds().length;
-    const total = document.querySelectorAll('.source-checkbox').length;
-    const countDisplay = document.getElementById('selectedCountDisplay');
+    const total = document.querySelectorAll('.source-item').length;
     const totalDisplay = document.getElementById('totalSourcesDisplay');
+    const countDisplay = document.getElementById('selectedCountDisplay');
     const badge = document.getElementById('inputScopeBadge');
-    if (countDisplay) countDisplay.innerText = selected;
     if (totalDisplay) totalDisplay.innerText = total;
-    if (badge) badge.innerText = `${selected} nguồn`;
+    if (countDisplay) countDisplay.innerText = total;
+    if (badge) badge.innerText = `${total} nguồn`;
 }
-
-document.querySelectorAll('.source-checkbox').forEach(cb => {
-    cb.addEventListener('change', () => {
-        updateSelectedSourcesCount();
-        renderDynamicStarterPrompts();
-    });
-});
-
-document.getElementById('selectAllSources')?.addEventListener('change', function(e) {
-    document.querySelectorAll('.source-checkbox').forEach(cb => cb.checked = e.target.checked);
-    updateSelectedSourcesCount();
-    renderDynamicStarterPrompts();
-});
 
 function autoResize(textarea) {
     textarea.style.height = 'auto';
@@ -306,9 +295,9 @@ function handleCitationChipClick(btn) {
     const page = btn.dataset.citPage || '1';
     const heading = btn.dataset.citHeading || 'Tổng quan';
     const snippet = btn.dataset.citSnippet || '';
-    const score = btn.dataset.citScore || '0.90';
+    const chunkId = btn.dataset.citChunkId || '0';
 
-    populateAndShowCitationModal(index, title, page, heading, snippet, score);
+    populateAndShowCitationModal(index, title, page, heading, snippet, parseInt(chunkId, 10));
 }
 
 // NotebookLM-Style Interactive Inline Citation Click Handler
@@ -328,7 +317,8 @@ function openInlineCitation(btn, index) {
                     found.documentTitle ?? found.DocumentTitle ?? 'Tài liệu trích dẫn', 
                     found.pageNumber ?? found.PageNumber ?? 1, 
                     found.heading ?? found.Heading ?? 'Chung', 
-                    found.snippet ?? found.Snippet ?? ''
+                    found.snippet ?? found.Snippet ?? '',
+                    found.chunkIndex ?? found.ChunkIndex ?? found.chunkId ?? found.ChunkId ?? 0
                 );
                 return;
             }
@@ -338,12 +328,22 @@ function openInlineCitation(btn, index) {
     }
 }
 
-function populateAndShowCitationModal(index, title, page, heading, snippet) {
+function populateAndShowCitationModal(index, title, page, heading, snippet, chunkId) {
     document.getElementById('modalCitIndexBadge').innerText = index;
     document.getElementById('modalCitDocTitle').innerText = title;
     document.getElementById('modalCitPage').innerText = page;
     document.getElementById('modalCitHeading').innerText = heading || 'Chung';
     document.getElementById('modalCitSnippet').innerText = snippet;
+    
+    const chunkBadge = document.getElementById('modalCitChunkBadge');
+    if (chunkBadge) {
+        if (chunkId && chunkId > 0) {
+            chunkBadge.innerText = `Chunk #${chunkId}`;
+            chunkBadge.classList.remove('d-none');
+        } else {
+            chunkBadge.classList.add('d-none');
+        }
+    }
     
     const modal = new bootstrap.Modal(document.getElementById('citationModal'));
     modal.show();
@@ -370,7 +370,11 @@ function formatMarkdown(text) {
     html = html.replace(/^### (.*$)/gim, '<h6 class="fw-bold text-white mt-2 mb-1">$1</h6>');
     html = html.replace(/^## (.*$)/gim, '<h5 class="fw-bold text-white mt-2 mb-1">$1</h5>');
 
-    // 5. NotebookLM Interactive Inline Citations [1], [2], [3]
+    // 5. NotebookLM Interactive Inline Citations [1], [2], [3] (and grouped [1, 5])
+    html = html.replace(/\[(\d+(?:\s*,\s*\d+)+)\]/g, function(match, nums) {
+        const parts = nums.split(',').map(n => n.trim());
+        return parts.map(n => `[${n}]`).join(' ');
+    });
     html = html.replace(/\[(\d+)\]/g, '<button type="button" class="inline-cit-pill" onclick="openInlineCitation(this, $1)" title="Xem nguồn trích dẫn $1">$1</button>');
 
     // 6. Linebreaks
@@ -667,7 +671,7 @@ async function submitChatQuestion() {
 
     const selectedDocIds = getSelectedDocIds();
     if (selectedDocIds.length === 0) {
-        showChatToast('Vui lòng chọn ít nhất 1 tài liệu nguồn ở cột bên trái!');
+        showChatToast('Môn học này hiện chưa có tài liệu nào sẵn sàng!');
         return;
     }
 

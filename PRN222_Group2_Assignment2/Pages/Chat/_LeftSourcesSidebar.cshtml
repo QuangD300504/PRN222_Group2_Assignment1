@@ -1,6 +1,8 @@
 @model ChatWorkspaceViewModel
 @{
     var totalSources = Model.SourceDocuments.Count;
+    var userRole = Context.Session.GetString("UserRole") ?? "";
+    var isSubjectLeader = string.Equals(userRole.Trim(), "SubjectLeader", StringComparison.OrdinalIgnoreCase);
 }
 
 <!-- ── LEFT SIDEBAR: SOURCES (Collapsible NotebookLM Style with Slim Rail) ──────── -->
@@ -52,20 +54,19 @@
         <div class="sidebar-scrollable-content custom-scrollbar p-3">
             <!-- Source Documents (Nguồn tài liệu) -->
             <div class="sources-section">
-                <!-- Add Source Button (Direct Upload inside Chat) -->
-                <button type="button" class="btn btn-outline-emerald btn-sm w-100 rounded-3 py-2 d-flex align-items-center justify-content-center gap-2 fw-semibold fs-8 mb-3 shadow-sm" 
-                        onclick="openUploadSourceModal()">
-                    <i class="bi bi-cloud-arrow-up-fill fs-6"></i> Thêm nguồn tài liệu
-                </button>
+                @if (isSubjectLeader)
+                {
+                    <!-- Add Source Button (Only for SubjectLeader) -->
+                    <button type="button" class="btn btn-outline-emerald btn-sm w-100 rounded-3 py-2 d-flex align-items-center justify-content-center gap-2 fw-semibold fs-8 mb-3 shadow-sm" 
+                            onclick="openUploadSourceModal()">
+                        <i class="bi bi-cloud-arrow-up-fill fs-6"></i> Thêm nguồn tài liệu
+                    </button>
+                }
 
-                <div class="d-flex align-items-center justify-content-between mb-2-5 pt-1">
+                <div class="d-flex align-items-center mb-2-5 pt-1">
                     <span class="fs-8 text-uppercase tracking-wider fw-bold text-slate-400">
-                        <i class="bi bi-folder2-open text-emerald-400 me-1"></i> Nguồn (<span id="selectedCountDisplay">@totalSources</span>/<span id="totalSourcesDisplay">@totalSources</span>)
+                        <i class="bi bi-folder2-open text-emerald-400 me-1"></i> Nguồn tài liệu (<span id="totalSourcesDisplay">@totalSources</span>)
                     </span>
-                    <label class="form-check-label fs-8 text-slate-400 cursor-pointer d-flex align-items-center gap-1">
-                        <input type="checkbox" id="selectAllSources" class="form-check-input form-check-input-sm" checked />
-                        Tất cả
-                    </label>
                 </div>
 
                 <div class="sources-list d-flex flex-column gap-2" id="sourcesList">
@@ -80,15 +81,12 @@
                     {
                         @foreach (var doc in Model.SourceDocuments)
                         {
-                            <label id="sourceDocItem-@doc.Id" class="source-item d-flex align-items-center gap-2 px-2-5 py-2 rounded-3 border border-slate-800 bg-slate-900/50 hover-bg-slate-850 cursor-pointer transition">
-                                <input type="checkbox" class="source-checkbox form-check-input flex-shrink-0 m-0" value="@doc.Id" checked data-title="@doc.Title" />
-                                <div class="d-flex align-items-center gap-1-5 overflow-hidden flex-grow-1" style="min-width: 0;">
-                                    <span class="badge @(doc.FileExtension == ".pdf" ? "bg-danger-subtle text-danger border border-danger-subtle" : doc.FileExtension == ".docx" ? "bg-primary-subtle text-primary border border-primary-subtle" : "bg-warning-subtle text-warning border border-warning-subtle") fs-9 flex-shrink-0">
-                                        @doc.FileExtension.ToUpper().Replace(".", "")
-                                    </span>
-                                    <span class="fs-8 text-slate-200 fw-medium text-truncate" title="@doc.Title">@doc.Title</span>
-                                </div>
-                            </label>
+                            <div id="sourceDocItem-@doc.Id" class="source-item d-flex align-items-center gap-2 px-2-5 py-2 rounded-3 border border-slate-800 bg-slate-900/50 hover-bg-slate-850 transition" data-doc-id="@doc.Id" data-title="@doc.Title">
+                                <span class="badge @(doc.FileExtension == ".pdf" ? "bg-danger-subtle text-danger border border-danger-subtle" : doc.FileExtension == ".docx" ? "bg-primary-subtle text-primary border border-primary-subtle" : "bg-warning-subtle text-warning border border-warning-subtle") fs-9 flex-shrink-0">
+                                    @doc.FileExtension.ToUpper().Replace(".", "")
+                                </span>
+                                <span class="fs-8 text-slate-200 fw-medium text-truncate" title="@doc.Title">@doc.Title</span>
+                            </div>
                         }
                     }
                 </div>
@@ -102,10 +100,22 @@
                 onclick="toggleLeftSidebar()" title="Mở rộng nguồn tài liệu">
             <i class="bi bi-layout-sidebar-inset fs-5"></i>
         </button>
-        <button type="button" class="btn btn-icon btn-sm text-emerald-400 hover-text-white p-2 rounded-2 bg-emerald-500-subtle border border-emerald-500-border" 
-                onclick="openUploadSourceModal()" title="Thêm nguồn tài liệu">
-            <i class="bi bi-plus-lg fs-5"></i>
+
+        <button type="button" class="btn btn-primary btn-sm rounded-circle p-2 d-flex align-items-center justify-content-center shadow-sm" 
+                onclick="startNewChatSeamless()" title="Cuộc trò chuyện mới">
+            <i class="bi bi-plus-lg fs-6"></i>
         </button>
+
+        <hr class="border-slate-800 w-75 my-1" />
+
+        @if (isSubjectLeader)
+        {
+            <button type="button" class="btn btn-icon btn-sm text-emerald-400 hover-text-white p-2 rounded-2 bg-emerald-500-subtle border border-emerald-500-border" 
+                    onclick="openUploadSourceModal()" title="Thêm nguồn tài liệu">
+                <i class="bi bi-plus-lg fs-5"></i>
+            </button>
+        }
+
         <div class="slim-icons-list custom-scrollbar d-flex flex-column align-items-center gap-2 w-100 overflow-y-auto px-1" id="slimSourcesList">
             @foreach (var doc in Model.SourceDocuments)
             {

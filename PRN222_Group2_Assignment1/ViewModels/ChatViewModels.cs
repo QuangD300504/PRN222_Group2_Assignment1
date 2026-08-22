@@ -4,6 +4,7 @@ public class CitationDto
 {
     public int Index { get; set; }
     public int ChunkId { get; set; }
+    public int ChunkIndex { get; set; }
     public string DocumentTitle { get; set; } = string.Empty;
     public int PageNumber { get; set; }
     public string? Heading { get; set; }
